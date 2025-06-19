@@ -18,15 +18,8 @@
 
         // Global variables for Firebase (provided by the Canvas environment)
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = {
-            apiKey: "AIzaSyCgzKEa86w3QhfRLcwjcUOBJgkBTUy6eAk",
-            authDomain: "joaquim-apps.firebaseapp.com",
-            projectId: "joaquim-apps",
-            storageBucket: "joaquim-apps.firebasestorage.app",
-            messagingSenderId: "196427752981",
-            appId: "1:196427752981:web:87f96f75538fc2a4b3901c",
-            measurementId: "G-V9Z7QNEJW2"
-};        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
         // Initialize Firebase
         const app = initializeApp(firebaseConfig);
@@ -421,7 +414,7 @@
 
         svg.call(zoom);
 
-        // UI Elements
+        // UI Elements (Moved to top for scope)
         const addMemberBtn = document.getElementById("add-member-btn");
         const addLinkBtn = document.getElementById("add-link-btn");
         const clearTreeBtn = document.getElementById("clear-tree-btn");
@@ -464,6 +457,8 @@
         const cancelLoadBtn = document.getElementById("cancel-load-btn");
 
         const userIdDisplay = document.getElementById("user-id-display");
+
+        const messageBox = document.getElementById("message-box"); // This was the one causing the error
 
         let editingNodeId = null; // To keep track of which node is being edited
 
