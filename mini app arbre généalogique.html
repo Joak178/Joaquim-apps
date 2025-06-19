@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arbre Généalogique Interactif</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Inter font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- D3.js CDN -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            overflow: hidden; /* Prevent body scroll */
+            background-color: #f0f4f8;
+        }
+
+        /* Styling for SVG nodes and links */
+        .node circle {
+            fill: #60a5fa; /* Blue-500 */
+            stroke: #3b82f6; /* Blue-600 */
+            stroke-width: 2px;
+            cursor: pointer;
+            transition: fill 0.2s, stroke 0.2s;
+        }
+
+        .node circle:hover {
+            fill: #3b82f6; /* Blue-600 on hover */
+        }
+
+        .node text {
+            font-size: 10px;
+            text-anchor: middle;
+            fill: #1f2937; /* Gray-800 */
+            pointer-events: none; /* Allows click-through to circle */
+            font-weight: 500;
+        }
+
+        .link {
+            stroke: #9ca3af; /* Gray-400 */
+            stroke-width: 1.5px;
+            fill: none;
+            transition: stroke 0.2s;
+        }
+
+        /* Modal specific styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 2.5rem; /* Increased padding */
+            border-radius: 12px; /* More rounded */
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            width: 90%;
+            max-width: 500px;
+            position: relative;
+            animation: fadeIn 0.3s ease-out;
+            max-height: 90vh; /* Limit height */
+            overflow-y: auto; /* Enable scrolling for content */
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Custom scrollbar for dropdowns */
+        select {
+            scrollbar-width: thin;
+            scrollbar-color: #9ca3af #e5e7eb;
+        }
+
+        select::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        select::-webkit-scrollbar-track {
+            background: #e5e7eb;
+            border-radius: 4px;
+        }
+
+        select::-webkit-scrollbar-thumb {
+            background-color: #9ca3af;
+            border-radius: 4px;
+            border: 2px solid #e5e7eb;
+        }
+
+        /* Tab styling */
+        .tab-button {
+            padding: 0.75rem 1.25rem;
+            border-bottom: 3px solid transparent;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            color: #6b7280; /* Gray-500 */
+        }
+        .tab-button.active {
+            border-color: #3b82f6; /* Blue-500 */
+            color: #1f2937; /* Gray-800 */
+        }
+    </style>
+</head>
+<body class="flex flex-col h-screen">
+
+    <!-- Header -->
+    <header class="bg-gradient-to-r from-blue-600 to-indigo-700 text-white p-4 shadow-lg z-10">
+        <h1 class="text-3xl font-bold text-center">Votre Arbre Généalogique</h1>
+    </header>
+
+    <!-- Main Content Area -->
+    <div class="flex flex-grow overflow-hidden">
+        <!-- Sidebar for Controls -->
+        <aside class="w-64 bg-white p-6 shadow-xl flex flex-col space-y-4 overflow-y-auto">
+            <h2 class="text-xl font-semibold text-gray-800 mb-4">Actions</h2>
+            <button id="add-member-btn" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-200 ease-in-out transform hover:scale-105">
+                Ajouter un Membre
+            </button>
+            <button id="add-link-btn" class="bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-200 ease-in-out transform hover:scale-105">
+                Ajouter un Lien
+            </button>
+            <button id="clear-tree-btn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-200 ease-in-out transform hover:scale-105">
+                Effacer l'Arbre
+            </button>
+        </aside>
+
+        <!-- SVG Container for D3 Tree -->
+        <main id="tree-container" class="flex-grow bg-blue-50 relative overflow-hidden">
+            <svg id="family-tree-svg" class="w-full h-full"></svg>
+        </main>
+    </div>
+
+    <!-- Modals -->
+
+    <!-- Add/Edit Member Modal -->
+    <div id="member-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <h3 id="member-modal-title" class="text-2xl font-bold text-gray-800 mb-6">Ajouter un Nouveau Membre</h3>
+
+            <!-- Tabs for Member Details -->
+            <div class="flex border-b border-gray-200 mb-6">
+                <button type="button" id="tab-general-info" class="tab-button active">Informations Générales</button>
+                <button type="button" id="tab-manage-links" class="tab-button">Gérer les Liens</button>
+            </div>
+
+            <!-- Tab Content: General Info -->
+            <div id="content-general-info" class="tab-content">
+                <form id="member-form-general" class="space-y-4">
+                    <div>
+                        <label for="member-name" class="block text-sm font-medium text-gray-700">Prénom:</label>
+                        <input type="text" id="member-name" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500" required>
+                    </div>
+                    <div>
+                        <label for="member-surname" class="block text-sm font-medium text-gray-700">Nom:</label>
+                        <input type="text" id="member-surname" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label for="member-birthdate" class="block text-sm font-medium text-gray-700">Date de Naissance:</label>
+                        <input type="date" id="member-birthdate" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label for="member-birthplace" class="block text-sm font-medium text-gray-700">Lieu de Naissance:</label>
+                        <input type="text" id="member-birthplace" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label for="member-notes" class="block text-sm font-medium text-gray-700">Informations supplémentaires:</label>
+                        <textarea id="member-notes" rows="3" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500"></textarea>
+                    </div>
+                    <div class="flex justify-end space-x-3 mt-6">
+                        <button type="button" id="cancel-member-btn-general" class="px-5 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold rounded-lg transition duration-200">
+                            Annuler
+                        </button>
+                        <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-md transition duration-200">
+                            Enregistrer
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Tab Content: Manage Links -->
+            <div id="content-manage-links" class="tab-content hidden">
+                <div class="pt-4 mt-2">
+                    <h4 class="text-lg font-semibold text-gray-800 mb-4">Liens Existants</h4>
+
+                    <!-- Existing Links Display -->
+                    <div id="existing-links" class="mb-4 space-y-2">
+                        <!-- Links will be dynamically added here -->
+                        <p class="text-sm text-gray-500" id="no-links-message">Aucun lien existant.</p>
+                    </div>
+
+                    <!-- Add New Link section -->
+                    <div class="bg-gray-50 p-4 rounded-md">
+                        <h5 class="text-md font-semibold text-gray-700 mb-3">Ajouter un Nouveau Lien</h5>
+                        <div class="space-y-3">
+                            <div>
+                                <label for="member-link-target" class="block text-sm font-medium text-gray-700">Lier à:</label>
+                                <select id="member-link-target" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">Sélectionner un membre</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="member-link-type" class="block text-sm font-medium text-gray-700">Type de Lien:</label>
+                                <select id="member-link-type" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="parent-child">Parent-Enfant</option>
+                                    <option value="spouse">Conjoint(e)</option>
+                                    <option value="sibling">Frère/Sœur</option>
+                                </select>
+                            </div>
+                            <button type="button" id="add-member-link-btn" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-200 ease-in-out transform hover:scale-105">
+                                Ajouter ce Lien
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button type="button" id="cancel-member-btn-links" class="px-5 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold rounded-lg transition duration-200">
+                        Fermer
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Link Modal (Still exists for general link adding, could be removed if preferred) -->
+    <div id="link-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <h3 class="text-2xl font-bold text-gray-800 mb-6">Ajouter un Lien</h3>
+            <form id="link-form" class="space-y-4">
+                <div>
+                    <label for="source-member" class="block text-sm font-medium text-gray-700">Membre Source:</label>
+                    <select id="source-member" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500" required>
+                        <option value="">Sélectionner un membre</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="target-member" class="block text-sm font-medium text-gray-700">Membre Cible:</label>
+                    <select id="target-member" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500" required>
+                        <option value="">Sélectionner un membre</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="link-type" class="block text-sm font-medium text-gray-700">Type de Lien:</label>
+                    <select id="link-type" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500" required>
+                        <option value="parent-child">Parent-Enfant</option>
+                        <option value="spouse">Conjoint(e)</option>
+                        <option value="sibling">Frère/Sœur</option>
+                    </select>
+                </div>
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button type="button" id="cancel-link-btn" class="px-5 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold rounded-lg transition duration-200">
+                        Annuler
+                    </button>
+                    <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-md transition duration-200">
+                        Créer Lien
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Clear Tree Confirmation Modal -->
+    <div id="confirm-clear-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <h3 class="text-2xl font-bold text-gray-800 mb-6">Confirmer l'Effacement</h3>
+            <p class="text-gray-700 mb-6">Êtes-vous sûr de vouloir effacer tout l'arbre généalogique ? Cette action est irréversible.</p>
+            <div class="flex justify-end space-x-3 mt-6">
+                <button type="button" id="cancel-clear-btn" class="px-5 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold rounded-lg transition duration-200">
+                    Annuler
+                </button>
+                <button type="button" id="confirm-clear-btn" class="px-5 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg shadow-md transition duration-200">
+                    Effacer
+                </button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Message Box -->
+    <div id="message-box" class="fixed bottom-4 right-4 bg-blue-600 text-white py-3 px-5 rounded-lg shadow-xl hidden z-20 transition-opacity duration-300 ease-out opacity-0">
+        Message
+    </div>
+
+    <script>
+        const svg = d3.select("#family-tree-svg");
+        const width = window.innerWidth - 256; // Full width minus sidebar width
+        const height = window.innerHeight - 80; // Full height minus header height
+
+        // Initial viewBox setup for responsive SVG
+        svg.attr("viewBox", `0 0 ${width} ${height}`)
+           .attr("preserveAspectRatio", "xMidYMid meet");
+
+        const g = svg.append("g"); // Group for zooming and panning
+
+        let nodes = [];
+        let links = [];
+        let nextNodeId = 1;
+
+        // D3 Force Simulation setup
+        const simulation = d3.forceSimulation(nodes)
+            .force("link", d3.forceLink(links).id(d => d.id).distance(100))
+            .force("charge", d3.forceManyBody().strength(-300)) // Repulsion force
+            .force("center", d3.forceCenter(width / 2, height / 2)); // Center gravity
+
+        // D3 Zoom behavior
+        const zoom = d3.zoom()
+            .scaleExtent([0.1, 4]) // Zoom limits
+            .on("zoom", (event) => {
+                g.attr("transform", event.transform);
+            });
+
+        svg.call(zoom);
+
+        // UI Elements
+        const addMemberBtn = document.getElementById("add-member-btn");
+        const addLinkBtn = document.getElementById("add-link-btn");
+        const clearTreeBtn = document.getElementById("clear-tree-btn");
+
+        const memberModal = document.getElementById("member-modal");
+        const memberFormGeneral = document.getElementById("member-form-general"); // Renamed form for clarity
+        const memberModalTitle = document.getElementById("member-modal-title");
+        const cancelMemberBtnGeneral = document.getElementById("cancel-member-btn-general");
+        const cancelMemberBtnLinks = document.getElementById("cancel-member-btn-links"); // New cancel button for links tab
+
+        const tabGeneralInfoBtn = document.getElementById("tab-general-info");
+        const tabManageLinksBtn = document.getElementById("tab-manage-links");
+        const contentGeneralInfo = document.getElementById("content-general-info");
+        const contentManageLinks = document.getElementById("content-manage-links");
+
+
+        const existingLinksDiv = document.getElementById("existing-links");
+        const memberLinkTargetSelect = document.getElementById("member-link-target");
+        const memberLinkTypeSelect = document.getElementById("member-link-type");
+        const addMemberLinkBtn = document.getElementById("add-member-link-btn");
+
+
+        const linkModal = document.getElementById("link-modal");
+        const linkForm = document.getElementById("link-form");
+        const sourceMemberSelect = document.getElementById("source-member");
+        const targetMemberSelect = document.getElementById("target-member");
+        const cancelLinkBtn = document.getElementById("cancel-link-btn");
+
+        const confirmClearModal = document.getElementById("confirm-clear-modal");
+        const cancelClearBtn = document.getElementById("cancel-clear-btn");
+        const confirmClearActionBtn = document.getElementById("confirm-clear-btn");
+
+        const messageBox = document.getElementById("message-box");
+
+        let editingNodeId = null; // To keep track of which node is being edited
+
+        // Function to show a temporary message
+        function showMessage(message, type = 'info') {
+            messageBox.textContent = message;
+            messageBox.classList.remove('bg-blue-600', 'bg-green-600', 'bg-red-600');
+            if (type === 'success') {
+                messageBox.classList.add('bg-green-600');
+            } else if (type === 'error') {
+                messageBox.classList.add('bg-red-600');
+            } else {
+                messageBox.classList.add('bg-blue-600');
+            }
+            messageBox.classList.remove('hidden', 'opacity-0');
+            messageBox.classList.add('opacity-100');
+
+            setTimeout(() => {
+                messageBox.classList.remove('opacity-100');
+                messageBox.classList.add('opacity-0');
+                setTimeout(() => messageBox.classList.add('hidden'), 300); // Hide after transition
+            }, 3000);
+        }
+
+        // Function to update the D3 visualization
+        function updateVisualization() {
+            // Update links
+            const link = g.selectAll(".link")
+                .data(links, d => d.source.id + "-" + d.target.id + "-" + d.type) // Unique key includes type
+                .join(
+                    enter => enter.append("line")
+                        .attr("class", "link")
+                        .attr("stroke-dasharray", d => d.type === 'spouse' ? "5,5" : "none") // Dotted line for spouse
+                        .attr("stroke-opacity", 0.6),
+                    update => update,
+                    exit => exit.remove()
+                );
+
+            // Update nodes
+            const node = g.selectAll(".node")
+                .data(nodes, d => d.id)
+                .join(
+                    enter => {
+                        const nodeGroup = enter.append("g")
+                            .attr("class", "node")
+                            .call(d3.drag() // Enable dragging for nodes
+                                .on("start", dragstarted)
+                                .on("drag", dragged)
+                                .on("end", dragended));
+
+                        nodeGroup.append("circle")
+                            .attr("r", 30); // Node radius
+
+                        nodeGroup.append("text")
+                            .attr("dy", "-0.8em") // Position name above circle
+                            .text(d => d.name || "");
+
+                        nodeGroup.append("text")
+                            .attr("dy", "0.6em") // Position surname below circle
+                            .text(d => d.surname || "");
+
+                        nodeGroup.on("click", function(event, d) {
+                            event.stopPropagation(); // Prevent SVG pan when clicking a node
+                            openEditMemberModal(d.id);
+                        });
+
+                        return nodeGroup;
+                    },
+                    update => {
+                        update.select("circle"); // Update circle (no attributes change here, but useful for chain)
+                        update.select("text:first-of-type").text(d => d.name || "");
+                        update.select("text:last-of-type").text(d => d.surname || "");
+                        return update;
+                    },
+                    exit => exit.remove()
+                );
+
+            // Update simulation with new data
+            simulation.nodes(nodes);
+            simulation.force("link").links(links);
+            simulation.alpha(1).restart(); // Restart simulation for new elements
+
+            // Update positions during simulation ticks
+            simulation.on("tick", () => {
+                link
+                    .attr("x1", d => d.source.x)
+                    .attr("y1", d => d.source.y)
+                    .attr("x2", d => d.target.x)
+                    .attr("y2", d => d.target.y);
+
+                node
+                    .attr("transform", d => `translate(${d.x},${d.y})`);
+            });
+        }
+
+        // Drag functions for nodes
+        function dragstarted(event, d) {
+            if (!event.active) simulation.alphaTarget(0.3).restart();
+            d.fx = d.x;
+            d.fy = d.y;
+        }
+
+        function dragged(event, d) {
+            d.fx = event.x;
+            d.fy = event.y;
+        }
+
+        function dragended(event, d) {
+            if (!event.active) simulation.alphaTarget(0);
+            d.fx = null; // Release fixed position
+            d.fy = null;
+        }
+
+        // --- Modals and Forms Logic ---
+
+        // Tab switching logic
+        function showTab(tabId) {
+            // Deactivate all tab buttons and hide all tab contents
+            tabGeneralInfoBtn.classList.remove("active");
+            tabManageLinksBtn.classList.remove("active");
+            contentGeneralInfo.classList.add("hidden");
+            contentManageLinks.classList.add("hidden");
+
+            // Activate the selected tab button and show its content
+            if (tabId === 'general') {
+                tabGeneralInfoBtn.classList.add("active");
+                contentGeneralInfo.classList.remove("hidden");
+            } else if (tabId === 'links') {
+                tabManageLinksBtn.classList.add("active");
+                contentManageLinks.classList.remove("hidden");
+            }
+        }
+
+        tabGeneralInfoBtn.addEventListener("click", () => showTab('general'));
+        tabManageLinksBtn.addEventListener("click", () => {
+            showTab('links');
+            populateMemberLinksInModal(editingNodeId); // Refresh links when switching to this tab
+            // Also populate the dropdown for adding new links if it's the links tab
+            memberLinkTargetSelect.innerHTML = '<option value="">Sélectionner un membre</option>';
+            if (editingNodeId) { // Only populate if a node is being edited
+                nodes.filter(n => n.id !== editingNodeId).forEach(node => {
+                    const option = document.createElement("option");
+                    option.value = node.id;
+                    option.textContent = `${node.name} ${node.surname}`;
+                    memberLinkTargetSelect.appendChild(option);
+                });
+            }
+        });
+
+
+        // Open Add Member Modal
+        addMemberBtn.addEventListener("click", () => {
+            editingNodeId = null;
+            memberModalTitle.textContent = "Ajouter un Nouveau Membre";
+            memberFormGeneral.reset();
+            // Hide tabs and link management for new member
+            tabGeneralInfoBtn.classList.add("active");
+            tabManageLinksBtn.classList.remove("active");
+            contentGeneralInfo.classList.remove("hidden");
+            contentManageLinks.classList.add("hidden");
+            tabGeneralInfoBtn.style.display = 'inline-block'; // Show general tab
+            tabManageLinksBtn.style.display = 'none'; // Hide links tab for new member
+            memberModal.classList.remove("hidden");
+        });
+
+        // Populate links in the member modal
+        function populateMemberLinksInModal(nodeId) {
+            existingLinksDiv.innerHTML = ''; // Clear previous links
+            const node = nodes.find(n => n.id === nodeId);
+
+            const relatedLinks = links.filter(l => l.source.id === nodeId || l.target.id === nodeId);
+
+            if (relatedLinks.length === 0) {
+                existingLinksDiv.innerHTML = '<p class="text-sm text-gray-500">Aucun lien existant.</p>';
+                return;
+            }
+
+            relatedLinks.forEach(link => {
+                const linkDiv = document.createElement("div");
+                linkDiv.classList.add("flex", "items-center", "justify-between", "p-2", "bg-white", "rounded-md", "shadow-sm", "border", "border-gray-200");
+
+                let description = "";
+                let otherMember = null;
+
+                if (link.source.id === nodeId) { // This node is the source
+                    otherMember = link.target;
+                    if (link.type === 'parent-child') {
+                        description = `Parent de: ${otherMember.name} ${otherMember.surname}`;
+                    } else if (link.type === 'spouse') {
+                        description = `Conjoint(e) de: ${otherMember.name} ${otherMember.surname}`;
+                    } else if (link.type === 'sibling') {
+                        description = `Frère/Sœur de: ${otherMember.name} ${otherMember.surname}`;
+                    }
+                } else { // This node is the target
+                    otherMember = link.source;
+                    if (link.type === 'parent-child') {
+                        description = `Enfant de: ${otherMember.name} ${otherMember.surname}`;
+                    } else if (link.type === 'spouse') {
+                        // For spouse, description is symmetrical
+                        description = `Conjoint(e) de: ${otherMember.name} ${otherMember.surname}`;
+                    } else if (link.type === 'sibling') {
+                        // For sibling, description is symmetrical
+                        description = `Frère/Sœur de: ${otherMember.name} ${otherMember.surname}`;
+                    }
+                }
+
+                const textSpan = document.createElement("span");
+                textSpan.textContent = description;
+                textSpan.classList.add("text-sm", "text-gray-700");
+
+                const deleteButton = document.createElement("button");
+                deleteButton.textContent = "Supprimer";
+                deleteButton.classList.add("px-3", "py-1", "bg-red-400", "hover:bg-red-500", "text-white", "text-xs", "font-semibold", "rounded-md", "transition", "duration-200");
+                deleteButton.onclick = () => deleteLink(link); // Pass the link object to the delete function
+
+                linkDiv.appendChild(textSpan);
+                linkDiv.appendChild(deleteButton);
+                existingLinksDiv.appendChild(linkDiv);
+            });
+        }
+
+        function deleteLink(linkToDelete) {
+            // Remove the specific link from the links array
+            links = links.filter(l => !(l.source.id === linkToDelete.source.id && l.target.id === linkToDelete.target.id && l.type === linkToDelete.type));
+
+            // If it's a spouse or sibling link, also remove the inverse link
+            if (linkToDelete.type === 'spouse' || linkToDelete.type === 'sibling') {
+                links = links.filter(l => !(l.source.id === linkToDelete.target.id && l.target.id === linkToDelete.source.id && l.type === linkToDelete.type));
+            }
+
+            showMessage("Lien supprimé !", "success");
+            updateVisualization();
+            // Re-populate the links list in the modal after deletion
+            populateMemberLinksInModal(editingNodeId);
+        }
+
+
+        // Open Edit Member Modal
+        function openEditMemberModal(id) {
+            editingNodeId = id;
+            memberModalTitle.textContent = "Modifier le Membre";
+            const nodeToEdit = nodes.find(n => n.id === id);
+            if (nodeToEdit) {
+                document.getElementById("member-name").value = nodeToEdit.name || "";
+                document.getElementById("member-surname").value = nodeToEdit.surname || "";
+                document.getElementById("member-birthdate").value = nodeToEdit.birthDate || "";
+                document.getElementById("member-birthplace").value = nodeToEdit.birthPlace || "";
+                document.getElementById("member-notes").value = nodeToEdit.notes || ""; // Populate notes field
+
+                // Show tabs and link management for existing member
+                tabGeneralInfoBtn.style.display = 'inline-block';
+                tabManageLinksBtn.style.display = 'inline-block';
+                showTab('general'); // Default to general info tab
+
+                // Populate member-link-target dropdown for new links, excluding the current node
+                memberLinkTargetSelect.innerHTML = '<option value="">Sélectionner un membre</option>';
+                nodes.filter(n => n.id !== id).forEach(node => {
+                    const option = document.createElement("option");
+                    option.value = node.id;
+                    option.textContent = `${node.name} ${node.surname}`;
+                    memberLinkTargetSelect.appendChild(option);
+                });
+                // Reset new link dropdowns
+                memberLinkTargetSelect.value = "";
+                memberLinkTypeSelect.value = "parent-child";
+
+                populateMemberLinksInModal(id); // Populate existing links initially
+            }
+            memberModal.classList.remove("hidden");
+        }
+
+        // Handle Member Form submission (General Info tab)
+        memberFormGeneral.addEventListener("submit", (event) => {
+            event.preventDefault();
+            const name = document.getElementById("member-name").value.trim();
+            const surname = document.getElementById("member-surname").value.trim();
+            const birthDate = document.getElementById("member-birthdate").value;
+            const birthPlace = document.getElementById("member-birthplace").value.trim();
+            const notes = document.getElementById("member-notes").value.trim(); // Get notes value
+
+            if (!name) {
+                showMessage("Le prénom est obligatoire.", "error");
+                return;
+            }
+
+            if (editingNodeId) {
+                // Update existing node
+                const nodeIndex = nodes.findIndex(n => n.id === editingNodeId);
+                if (nodeIndex !== -1) {
+                    nodes[nodeIndex].name = name;
+                    nodes[nodeIndex].surname = surname;
+                    nodes[nodeIndex].birthDate = birthDate;
+                    nodes[nodeIndex].birthPlace = birthPlace;
+                    nodes[nodeIndex].notes = notes; // Save notes
+                    showMessage("Membre mis à jour avec succès !", "success");
+                }
+            } else {
+                // Add new node
+                const newNode = {
+                    id: nextNodeId++,
+                    name,
+                    surname,
+                    birthDate,
+                    birthPlace,
+                    notes // Add notes to new node
+                };
+                nodes.push(newNode);
+                showMessage("Membre ajouté avec succès !", "success");
+            }
+
+            memberModal.classList.add("hidden");
+            updateVisualization();
+        });
+
+        // Cancel Member Modal (General Info tab)
+        cancelMemberBtnGeneral.addEventListener("click", () => {
+            memberModal.classList.add("hidden");
+            memberFormGeneral.reset();
+        });
+
+        // Cancel Member Modal (Links tab)
+        cancelMemberBtnLinks.addEventListener("click", () => {
+            memberModal.classList.add("hidden");
+            memberFormGeneral.reset(); // Reset general form too, just in case
+        });
+
+
+        // Event listener for adding new links from within the member modal
+        addMemberLinkBtn.addEventListener("click", () => {
+            const targetId = parseInt(memberLinkTargetSelect.value);
+            const linkType = memberLinkTypeSelect.value;
+
+            if (!targetId || !linkType) {
+                showMessage("Veuillez sélectionner un membre cible et un type de lien.", "error");
+                return;
+            }
+            if (editingNodeId === targetId) {
+                showMessage("Impossible de lier un membre à lui-même.", "error");
+                return;
+            }
+
+            addOrUpdateLink(editingNodeId, targetId, linkType); // Reuse existing logic
+            // After adding, refresh the links displayed in the modal
+            populateMemberLinksInModal(editingNodeId);
+            // Reset the dropdowns for adding new links
+            memberLinkTargetSelect.value = "";
+            memberLinkTypeSelect.value = "parent-child"; // Default
+        });
+
+
+        // Populate member dropdowns for Link Modal (main "Ajouter un Lien" button)
+        function populateMemberSelects() {
+            sourceMemberSelect.innerHTML = '<option value="">Sélectionner un membre</option>';
+            targetMemberSelect.innerHTML = '<option value="">Sélectionner un membre</option>';
+
+            nodes.forEach(node => {
+                const option1 = document.createElement("option");
+                option1.value = node.id;
+                option1.textContent = `${node.name} ${node.surname}`;
+                sourceMemberSelect.appendChild(option1);
+
+                const option2 = document.createElement("option");
+                option2.value = node.id;
+                option2.textContent = `${node.name} ${node.surname}`;
+                targetMemberSelect.appendChild(option2);
+            });
+        }
+
+        // Function to add a link and handle inferred links
+        function addOrUpdateLink(sourceId, targetId, linkType) {
+            const sourceNode = nodes.find(n => n.id === sourceId);
+            const targetNode = nodes.find(n => n.id === targetId);
+
+            if (!sourceNode || !targetNode) {
+                showMessage("Erreur: Membres source ou cible introuvables.", "error");
+                return;
+            }
+
+            // Check if the exact link already exists (considering direction for parent-child)
+            const linkExists = links.some(link =>
+                link.source.id === sourceId && link.target.id === targetId && link.type === linkType
+            );
+
+            // For spouse/sibling, check bidirectional
+            if (linkType === 'spouse' || linkType === 'sibling') {
+                if (links.some(link =>
+                    (link.source.id === targetId && link.target.id === sourceId && link.type === linkType) ||
+                    (link.source.id === sourceId && link.target.id === targetId && link.type === linkType)
+                )) {
+                    showMessage("Ce lien existe déjà.", "error");
+                    return;
+                }
+            } else if (linkExists) {
+                showMessage("Ce lien existe déjà.", "error");
+                return;
+            }
+
+            links.push({ source: sourceNode, target: targetNode, type: linkType });
+            let inferredCount = 0;
+
+            // --- Inferred Link Logic ---
+            if (linkType === 'parent-child') {
+                // If Parent -> Child link is added:
+                // Find spouse(s) of the parent, and make them also parents of the child
+                const parentSpouses = links.filter(l =>
+                    (l.source.id === sourceNode.id && l.type === 'spouse') ||
+                    (l.target.id === sourceNode.id && l.type === 'spouse')
+                ).map(l => l.source.id === sourceNode.id ? l.target : l.source);
+
+                parentSpouses.forEach(spouseNode => {
+                    // Check if spouse is already a parent of the child
+                    const spouseToChildLinkExists = links.some(l =>
+                        l.source.id === spouseNode.id && l.target.id === targetNode.id && l.type === 'parent-child'
+                    );
+                    if (!spouseToChildLinkExists && spouseNode.id !== targetNode.id && spouseNode.id !== sourceNode.id) {
+                        links.push({ source: spouseNode, target: targetNode, type: 'parent-child' });
+                        inferredCount++;
+                    }
+                });
+
+            } else if (linkType === 'spouse') {
+                // If Spouse1 <-> Spouse2 link is added:
+                // Make Spouse1 a parent of all children of Spouse2, and vice versa.
+
+                // Children of sourceNode
+                const sourceChildren = links.filter(l =>
+                    l.source.id === sourceNode.id && l.type === 'parent-child'
+                ).map(l => l.target);
+
+                sourceChildren.forEach(childNode => {
+                    const targetAsParentLinkExists = links.some(l =>
+                        l.source.id === targetNode.id && l.target.id === childNode.id && l.type === 'parent-child'
+                    );
+                    if (!targetAsParentLinkExists && targetNode.id !== childNode.id && targetNode.id !== sourceNode.id) {
+                        links.push({ source: targetNode, target: childNode, type: 'parent-child' });
+                        inferredCount++;
+                    }
+                });
+
+                // Children of targetNode
+                const targetChildren = links.filter(l =>
+                    l.source.id === targetNode.id && l.type === 'parent-child'
+                ).map(l => l.target);
+
+                targetChildren.forEach(childNode => {
+                    const sourceAsParentLinkExists = links.some(l =>
+                        l.source.id === sourceNode.id && l.target.id === childNode.id && l.type === 'parent-child'
+                    );
+                    if (!sourceAsParentLinkExists && sourceNode.id !== childNode.id && sourceNode.id !== targetNode.id) {
+                        links.push({ source: sourceNode, target: childNode, type: 'parent-child' });
+                        inferredCount++;
+                    }
+                });
+            }
+
+            let message = "Lien créé avec succès !";
+            if (inferredCount > 0) {
+                message += ` ${inferredCount} lien(s) supplémentaire(s) ont été inférés.`;
+            }
+            showMessage(message, "success");
+
+            updateVisualization();
+        }
+
+
+        // Open Add Link Modal (main "Ajouter un Lien" button)
+        addLinkBtn.addEventListener("click", () => {
+            if (nodes.length < 2) {
+                showMessage("Vous avez besoin d'au moins deux membres pour créer un lien.", "error");
+                return;
+            }
+            populateMemberSelects();
+            linkForm.reset();
+            linkModal.classList.remove("hidden");
+        });
+
+        // Handle Link Form submission (main "Ajouter un Lien" button)
+        linkForm.addEventListener("submit", (event) => {
+            event.preventDefault();
+            const sourceId = parseInt(sourceMemberSelect.value);
+            const targetId = parseInt(targetMemberSelect.value);
+            const linkType = document.getElementById("link-type").value;
+
+            if (sourceId === targetId) {
+                showMessage("La source et la cible ne peuvent pas être le même membre.", "error");
+                return;
+            }
+
+            addOrUpdateLink(sourceId, targetId, linkType);
+            linkModal.classList.add("hidden");
+            linkForm.reset();
+        });
+
+        // Cancel Link Modal (main "Ajouter un Lien" button)
+        cancelLinkBtn.addEventListener("click", () => {
+            linkModal.classList.add("hidden");
+            linkForm.reset();
+        });
+
+        // Clear Tree
+        clearTreeBtn.addEventListener("click", () => {
+            confirmClearModal.classList.remove("hidden");
+        });
+
+        cancelClearBtn.addEventListener("click", () => {
+            confirmClearModal.classList.add("hidden");
+        });
+
+        confirmClearActionBtn.addEventListener("click", () => {
+            nodes = [];
+            links = [];
+            nextNodeId = 1;
+            updateVisualization();
+            showMessage("L'arbre a été effacé.", "info");
+            confirmClearModal.classList.add("hidden");
+        });
+
+
+        // Initial update to render an empty tree (or any predefined data)
+        updateVisualization();
+
+        // Optional: Add some initial example data for quick testing
+        // setTimeout(() => {
+        //     nodes.push(
+        //         { id: nextNodeId++, name: "Alice", surname: "Dubois", birthDate: "1950-01-01", birthPlace: "Paris", notes: "Grand-mère maternelle" },
+        //         { id: nextNodeId++, name: "Bob", surname: "Martin", birthDate: "1948-05-10", birthPlace: "Lyon", notes: "Grand-père maternel" },
+        //         { id: nextNodeId++, name: "Charlie", surname: "Dubois", birthDate: "1975-03-15", birthPlace: "Paris", notes: "Père" },
+        //         { id: nextNodeId++, name: "Dana", surname: "Martin", birthDate: "1978-07-20", birthPlace: "Lyon", notes: "Mère" }
+        //     );
+        //     // Manually add the initial links for testing
+        //     addOrUpdateLink(nodes[0].id, nodes[1].id, "spouse"); // Alice-Bob
+        //     addOrUpdateLink(nodes[0].id, nodes[2].id, "parent-child"); // Alice-Charlie (Bob should be inferred)
+        //     addOrUpdateLink(nodes[1].id, nodes[3].id, "parent-child"); // Bob-Dana (Alice should be inferred)
+        // }, 500);
+
+    </script>
+</body>
+</html>
