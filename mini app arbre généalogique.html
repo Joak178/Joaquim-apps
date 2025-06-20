@@ -17,21 +17,27 @@
         import { getFirestore, doc, setDoc, collection, query, onSnapshot, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Global variables for Firebase (provided by the Canvas environment)
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        const firebaseConfig = {
+            apiKey: "AIzaSyCgzKEa86w3QhfRLcwjcUOBJgkBTUy6eAk",
+            authDomain: "joaquim-apps.firebaseapp.com",
+            projectId: "joaquim-apps",
+            storageBucket: "joaquim-apps.firebasestorage.app",
+            messagingSenderId: "196427752981",
+            appId: "1:196427752981:web:87f96f75538fc2a4b3901c",
+            measurementId: "G-V9Z7QNEJW2"
+};        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
         // Initialize Firebase
         const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        const auth = getAuth(app);
+        const db1 = getFirestore(app);
+        const auth1 = getAuth(app);
 
         // Export them to the global window object so they can be accessed by the main script
         window.firebaseApp = app;
-        window.firebaseDb = db;
-        window.firebaseAuth = auth;
+        window.firebaseDb = db1;
+        window.firebaseAuth = auth1;
         window.firebaseInitialAuthToken = initialAuthToken;
-        window.firebaseAppId = appId;
+        window.firebaseAppId = firebaseConfig.appId; // Use appId directly from firebaseConfig
         window.onAuthStateChanged = onAuthStateChanged;
         window.signInAnonymously = signInAnonymously;
         window.signInWithCustomToken = signInWithCustomToken;
@@ -392,29 +398,8 @@
         let links = [];
         let nextNodeId = 1; // Used for unique ID generation for new nodes
 
-        // Firebase variables (accessed from window due to module import)
-        let db;
-        let auth;
-        let userId;
-        let appId;
-        let isAuthReady = false; // Flag to ensure Firestore operations run after auth
-
-        // D3 Force Simulation setup
-        const simulation = d3.forceSimulation(nodes)
-            .force("link", d3.forceLink(links).id(d => d.id).distance(100))
-            .force("charge", d3.forceManyBody().strength(-300)) // Repulsion force
-            .force("center", d3.forceCenter(width / 2, height / 2)); // Center gravity
-
-        // D3 Zoom behavior
-        const zoom = d3.zoom()
-            .scaleExtent([0.1, 4]) // Zoom limits
-            .on("zoom", (event) => {
-                g.attr("transform", event.transform);
-            });
-
-        svg.call(zoom);
-
         // UI Elements (Moved to top for scope)
+        // C'est cette section qui a été déplacée pour s'assurer que les éléments sont définis avant d'être utilisés.
         const addMemberBtn = document.getElementById("add-member-btn");
         const addLinkBtn = document.getElementById("add-link-btn");
         const clearTreeBtn = document.getElementById("clear-tree-btn");
@@ -458,7 +443,30 @@
 
         const userIdDisplay = document.getElementById("user-id-display");
 
-        const messageBox = document.getElementById("message-box"); // This was the one causing the error
+        const messageBox = document.getElementById("message-box");
+        // --- FIN DES DÉCLARATIONS DES ÉLÉMENTS DE L'INTERFACE UTILISATEUR ---
+
+        // Firebase variables (accessed from window due to module import)
+        let db;
+        let auth;
+        let userId;
+        let appId;
+        let isAuthReady = false; // Flag to ensure Firestore operations run after auth
+
+        // D3 Force Simulation setup
+        const simulation = d3.forceSimulation(nodes)
+            .force("link", d3.forceLink(links).id(d => d.id).distance(100))
+            .force("charge", d3.forceManyBody().strength(-300)) // Repulsion force
+            .force("center", d3.forceCenter(width / 2, height / 2)); // Center gravity
+
+        // D3 Zoom behavior
+        const zoom = d3.zoom()
+            .scaleExtent([0.1, 4]) // Zoom limits
+            .on("zoom", (event) => {
+                g.attr("transform", event.transform);
+            });
+
+        svg.call(zoom);
 
         let editingNodeId = null; // To keep track of which node is being edited
 
@@ -481,11 +489,10 @@
                 } else {
                     console.log("Authentification anonyme...");
                     try {
-                        if (window.firebaseInitialAuthToken) {
-                            await window.signInWithCustomToken(auth, window.firebaseInitialAuthToken);
-                        } else {
-                            await window.signInAnonymously(auth);
-                        }
+                        // For GitHub Pages deployment, we typically don't use custom tokens unless explicitly generated by a backend.
+                        // Rely solely on anonymous sign-in for this setup.
+                        // The __initial_auth_token is specific to the Canvas environment and is not relevant here.
+                        await window.signInAnonymously(auth);
                     } catch (error) {
                         console.error("Erreur d'authentification Firebase:", error);
                         showMessage("Erreur d'authentification: " + error.message, "error");
@@ -652,7 +659,7 @@
             // Hide tabs and link management for new member
             tabGeneralInfoBtn.classList.add("active");
             tabManageLinksBtn.classList.remove("active");
-            contentGeneralInfo.classList.remove("hidden");
+            contentGeneralInfo.classList.add("hidden"); // Ensure general info is visible
             contentManageLinks.classList.add("hidden");
             tabGeneralInfoBtn.style.display = 'inline-block'; // Show general tab
             tabManageLinksBtn.style.display = 'none'; // Hide links tab for new member
