@@ -6,6 +6,8 @@
     <title>Calculateur de Coût de Production Etsy x Gelato</title>
     <!-- Tailwind CSS CDN for modern styling -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js for creating the interactive graph -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         /* Custom styles for Inter font and general layout */
         body {
@@ -117,6 +119,10 @@
         .summary-card p.total span {
             color: #1d4ed8;
         }
+        #chart-container {
+            margin-top: 24px;
+            margin-bottom: 16px;
+        }
     </style>
 </head>
 <body>
@@ -126,35 +132,30 @@
         <!-- Input for Gelato Production Price -->
         <div class="input-group mb-4">
             <label for="gelatoPrice">Prix de production Gelato (€) :</label>
-            <input type="number" id="gelatoPrice" value="0" min="0" step="0.01" placeholder="Entrez le prix de Gelato" oninput="calculateCost()">
+            <input type="number" id="gelatoPrice" value="0" min="0" step="0.01" placeholder="Entrez le prix de Gelato" oninput="updateSummary()">
         </div>
 
         <!-- Input for Shipping Cost -->
         <div class="input-group mb-4">
             <label for="shippingCost">Frais de transport (€) :</label>
-            <input type="number" id="shippingCost" value="5" min="0" step="0.01" placeholder="Frais de transport (par défaut 5€)" oninput="calculateCost()">
+            <input type="number" id="shippingCost" value="5" min="0" step="0.01" placeholder="Frais de transport (par défaut 5€)" oninput="updateSummary()">
         </div>
 
         <!-- Input for Buyer's Shipping Contribution -->
         <div class="input-group mb-4">
             <label for="buyerShippingContributionInput">Contribution livraison (payée par l'acheteur) (€) :</label>
-            <input type="number" id="buyerShippingContributionInput" value="5" min="0" step="0.01" placeholder="Montant payé par le client pour la livraison" oninput="calculateCost()">
+            <input type="number" id="buyerShippingContributionInput" value="5" min="0" step="0.01" placeholder="Montant payé par le client pour la livraison" oninput="updateSummary()">
         </div>
 
         <!-- Input for Desired Selling Price on Etsy -->
         <div class="input-group mb-6">
             <label for="desiredSellingPrice">Prix de vente désiré sur Etsy (€) :</label>
-            <input type="number" id="desiredSellingPrice" value="0" min="0" step="0.01" placeholder="Entrez le prix de vente désiré" oninput="calculateCost()">
-        </div>
-
-        <!-- Button to trigger calculation -->
-        <div class="button-group">
-            <button onclick="calculateCost()">Calculer le coût total</button>
+            <input type="number" id="desiredSellingPrice" value="0" min="0" step="0.01" placeholder="Entrez le prix de vente désiré" oninput="updateSummary()">
         </div>
 
         <!-- Interactive Summary Section -->
         <div class="summary-card">
-            <h2 class="text-lg font-bold mb-4 text-center text-gray-700">Résumé des coûts</h2>
+            <h2 class="text-lg font-bold mb-4 text-center text-gray-700">Résumé pour le prix actuel</h2>
             <p>
                 Coût Gelato : 
                 <span id="summaryGelatoCost">0.00 €</span>
@@ -199,39 +200,41 @@
                 <span id="summaryTotalCost">0.00 €</span>
             </p>
         </div>
+
+        <hr class="my-6 border-gray-300">
+
+        <!-- Input for Max and Min Selling Price for the chart -->
+        <div class="flex space-x-4 mb-6">
+            <div class="input-group w-1/2">
+                <label for="minPriceInput">Prix min. du graphique (€) :</label>
+                <input type="number" id="minPriceInput" value="0" min="0" step="1">
+            </div>
+            <div class="input-group w-1/2">
+                <label for="maxPriceInput">Prix max. du graphique (€) :</label>
+                <input type="number" id="maxPriceInput" value="50" min="10" step="1">
+            </div>
+        </div>
+
+        <!-- Canvas for the chart -->
+        <div id="chart-container">
+            <canvas id="costChart"></canvas>
+        </div>
+
+        <!-- Button to show chart -->
+        <div class="button-group mt-4">
+            <button onclick="showChart()">Afficher le graphique du bénéfice</button>
+        </div>
+
     </div>
 
     <script>
+        let myChart = null; // Variable to hold the Chart.js instance
+
         /**
-         * Calculates the total production cost of a product for Etsy,
-         * considering Gelato production price, shipping, VAT, and Etsy fees.
-         * It also accounts for the shipping fees paid by the buyer and auto-entrepreneur tax.
+         * Calculates all cost components for a single selling price.
+         * This is a helper function used by both the summary and the chart generation.
          */
-        function calculateCost() {
-            // Get input values from the DOM
-            const gelatoPriceInput = document.getElementById('gelatoPrice');
-            const shippingCostInput = document.getElementById('shippingCost');
-            const buyerShippingContributionInput = document.getElementById('buyerShippingContributionInput');
-            const desiredSellingPriceInput = document.getElementById('desiredSellingPrice');
-            
-            // Get summary display elements
-            const summaryGelatoCost = document.getElementById('summaryGelatoCost');
-            const summaryShippingCost = document.getElementById('summaryShippingCost');
-            const summaryVatCost = document.getElementById('summaryVatCost');
-            const summaryEtsyTransactionFees = document.getElementById('summaryEtsyTransactionFees');
-            const summaryEtsyPaymentFees = document.getElementById('summaryEtsyPaymentFees');
-            const summaryEtsyRegulatoryFees = document.getElementById('summaryEtsyRegulatoryFees');
-            const summaryEtsyVat = document.getElementById('summaryEtsyVat');
-            const summaryAutoTax = document.getElementById('summaryAutoTax');
-            const summaryBuyerContribution = document.getElementById('summaryBuyerContribution');
-            const summaryTotalCost = document.getElementById('summaryTotalCost');
-
-            // Parse input values as floats. Use 0 if input is invalid or empty.
-            const gelatoPrice = parseFloat(gelatoPriceInput.value) || 0;
-            const shippingCost = parseFloat(shippingCostInput.value) || 0;
-            const desiredSellingPrice = parseFloat(desiredSellingPriceInput.value) || 0;
-            const buyerShippingContribution = parseFloat(buyerShippingContributionInput.value) || 0;
-
+        function calculateSinglePointCost(gelatoPrice, shippingCost, buyerShippingContribution, desiredSellingPrice) {
             // Total revenue for Etsy's calculations
             const totalRevenue = desiredSellingPrice + buyerShippingContribution;
 
@@ -241,7 +244,7 @@
             // Calculate detailed Etsy fees before VAT
             const etsyTransactionFees = totalRevenue * 0.065;
             const etsyPaymentProcessingFees = (totalRevenue * 0.04) + 0.30;
-            const etsyRegulatoryFees = (desiredSellingPrice + buyerShippingContribution) * 0.0047;
+            const etsyRegulatoryFees = desiredSellingPrice * 0.0047;
 
             // Calculate VAT on all Etsy fees (assuming 20%)
             const totalEtsyFeesBeforeVat = etsyTransactionFees + etsyPaymentProcessingFees + etsyRegulatoryFees;
@@ -259,22 +262,170 @@
             // Calculate the final total cost of the product
             // Subtract the buyer's shipping contribution from the total expenses
             const totalCost = totalExpenses - buyerShippingContribution;
+            
+            return {
+                totalCost,
+                vat,
+                etsyTransactionFees,
+                etsyPaymentProcessingFees,
+                etsyRegulatoryFees,
+                etsyFeesVat,
+                autoEntrepreneurTax
+            };
+        }
+
+        /**
+         * Updates the interactive summary with the cost details for the current input values.
+         */
+        function updateSummary() {
+            // Get input values from the DOM
+            const gelatoPriceInput = document.getElementById('gelatoPrice');
+            const shippingCostInput = document.getElementById('shippingCost');
+            const buyerShippingContributionInput = document.getElementById('buyerShippingContributionInput');
+            const desiredSellingPriceInput = document.getElementById('desiredSellingPrice');
+            
+            // Get summary display elements
+            const summaryGelatoCost = document.getElementById('summaryGelatoCost');
+            const summaryShippingCost = document.getElementById('summaryShippingCost');
+            const summaryVatCost = document = document.getElementById('summaryVatCost');
+            const summaryEtsyTransactionFees = document.getElementById('summaryEtsyTransactionFees');
+            const summaryEtsyPaymentFees = document.getElementById('summaryEtsyPaymentFees');
+            const summaryEtsyRegulatoryFees = document.getElementById('summaryEtsyRegulatoryFees');
+            const summaryEtsyVat = document.getElementById('summaryEtsyVat');
+            const summaryAutoTax = document.getElementById('summaryAutoTax');
+            const summaryBuyerContribution = document.getElementById('summaryBuyerContribution');
+            const summaryTotalCost = document.getElementById('summaryTotalCost');
+
+            // Parse input values as floats. Use 0 if input is invalid or empty.
+            const gelatoPrice = parseFloat(gelatoPriceInput.value) || 0;
+            const shippingCost = parseFloat(shippingCostInput.value) || 0;
+            const desiredSellingPrice = parseFloat(desiredSellingPriceInput.value) || 0;
+            const buyerShippingContribution = parseFloat(buyerShippingContributionInput.value) || 0;
+
+            const costs = calculateSinglePointCost(gelatoPrice, shippingCost, buyerShippingContribution, desiredSellingPrice);
 
             // Update the interactive summary with the calculated values
             summaryGelatoCost.textContent = gelatoPrice.toFixed(2) + ' €';
             summaryShippingCost.textContent = shippingCost.toFixed(2) + ' €';
-            summaryVatCost.textContent = vat.toFixed(2) + ' €';
-            summaryEtsyTransactionFees.textContent = etsyTransactionFees.toFixed(2) + ' €';
-            summaryEtsyPaymentFees.textContent = etsyPaymentProcessingFees.toFixed(2) + ' €';
-            summaryEtsyRegulatoryFees.textContent = etsyRegulatoryFees.toFixed(2) + ' €';
-            summaryEtsyVat.textContent = etsyFeesVat.toFixed(2) + ' €';
-            summaryAutoTax.textContent = autoEntrepreneurTax.toFixed(2) + ' €';
+            summaryVatCost.textContent = costs.vat.toFixed(2) + ' €';
+            summaryEtsyTransactionFees.textContent = costs.etsyTransactionFees.toFixed(2) + ' €';
+            summaryEtsyPaymentFees.textContent = costs.etsyPaymentProcessingFees.toFixed(2) + ' €';
+            summaryEtsyRegulatoryFees.textContent = costs.etsyRegulatoryFees.toFixed(2) + ' €';
+            summaryEtsyVat.textContent = costs.etsyFeesVat.toFixed(2) + ' €';
+            summaryAutoTax.textContent = costs.autoEntrepreneurTax.toFixed(2) + ' €';
             summaryBuyerContribution.textContent = '-' + buyerShippingContribution.toFixed(2) + ' €';
-            summaryTotalCost.textContent = totalCost.toFixed(2) + ' €';
+            summaryTotalCost.textContent = costs.totalCost.toFixed(2) + ' €';
         }
 
-        // Call calculateCost initially to display default values
-        window.onload = calculateCost;
+        /**
+         * Generates and displays a chart showing total cost and revenue based on selling price.
+         */
+        function showChart() {
+            const ctx = document.getElementById('costChart').getContext('2d');
+
+            // Get current fixed costs from the inputs
+            const gelatoPrice = parseFloat(document.getElementById('gelatoPrice').value) || 0;
+            const shippingCost = parseFloat(document.getElementById('shippingCost').value) || 0;
+            const buyerShippingContribution = parseFloat(document.getElementById('buyerShippingContributionInput').value) || 0;
+            const minPrice = parseFloat(document.getElementById('minPriceInput').value) || 0;
+            const maxPrice = parseFloat(document.getElementById('maxPriceInput').value) || 50;
+
+            // Generate data points for the graph
+            const labels = [];
+            const profitData = [];
+
+            // Prevent infinite loop if minPrice >= maxPrice
+            if (minPrice >= maxPrice) {
+                if (myChart) {
+                    myChart.destroy();
+                }
+                const errorMessage = "Le prix minimum doit être inférieur au prix maximum.";
+                const errorDiv = document.createElement('div');
+                errorDiv.textContent = errorMessage;
+                errorDiv.style.color = "red";
+                errorDiv.style.textAlign = "center";
+                errorDiv.style.marginTop = "20px";
+                document.getElementById('chart-container').innerHTML = '';
+                document.getElementById('chart-container').appendChild(errorDiv);
+                return;
+            }
+
+            // Loop from minPrice to maxPrice, with a step of 1€
+            for (let price = minPrice; price <= maxPrice; price += 1) {
+                labels.push(price.toFixed(0));
+                const costs = calculateSinglePointCost(gelatoPrice, shippingCost, buyerShippingContribution, price);
+                const profit = price - costs.totalCost;
+                profitData.push(profit);
+            }
+
+            if (myChart) {
+                myChart.destroy(); // Destroy previous chart instance if it exists
+            }
+
+            myChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Bénéfice réel (€)',
+                            data: profitData,
+                            borderColor: '#10b981', // Green color for profit line
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                            fill: true,
+                            tension: 0.2
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                font: {
+                                    size: 14
+                                }
+                            }
+                        },
+                        title: {
+                            display: true,
+                            text: 'Bénéfice réel en fonction du prix de vente',
+                            font: {
+                                size: 16
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Prix de vente (€)',
+                                font: {
+                                    size: 14
+                                }
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Bénéfice (€)',
+                                font: {
+                                    size: 14
+                                }
+                            },
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        // Initialize the summary and the chart when the page loads
+        window.onload = () => {
+          updateSummary();
+          showChart();
+        };
     </script>
 </body>
 </html>
