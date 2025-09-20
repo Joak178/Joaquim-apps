@@ -88,6 +88,35 @@
         .button-group button:active {
             transform: translateY(0); /* Reset on click */
         }
+        .summary-card {
+            margin-top: 24px;
+            padding: 20px;
+            background-color: #f8fafc; /* Lighter grey background */
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            text-align: left;
+        }
+        .summary-card p {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 1rem;
+            color: #4b5563;
+        }
+        .summary-card p.total {
+            font-weight: bold;
+            color: #1d4ed8;
+            margin-top: 12px;
+            padding-top: 8px;
+            border-top: 2px solid #e2e8f0;
+        }
+        .summary-card p span {
+            font-weight: 600;
+            color: #059669;
+        }
+        .summary-card p.total span {
+            color: #1d4ed8;
+        }
     </style>
 </head>
 <body>
@@ -97,19 +126,25 @@
         <!-- Input for Gelato Production Price -->
         <div class="input-group mb-4">
             <label for="gelatoPrice">Prix de production Gelato (€) :</label>
-            <input type="number" id="gelatoPrice" value="0" min="0" step="0.01" placeholder="Entrez le prix de Gelato">
+            <input type="number" id="gelatoPrice" value="0" min="0" step="0.01" placeholder="Entrez le prix de Gelato" oninput="calculateCost()">
         </div>
 
         <!-- Input for Shipping Cost -->
         <div class="input-group mb-4">
             <label for="shippingCost">Frais de transport (€) :</label>
-            <input type="number" id="shippingCost" value="5" min="0" step="0.01" placeholder="Frais de transport (par défaut 5€)">
+            <input type="number" id="shippingCost" value="5" min="0" step="0.01" placeholder="Frais de transport (par défaut 5€)" oninput="calculateCost()">
+        </div>
+
+        <!-- Input for Buyer's Shipping Contribution -->
+        <div class="input-group mb-4">
+            <label for="buyerShippingContributionInput">Contribution livraison (payée par l'acheteur) (€) :</label>
+            <input type="number" id="buyerShippingContributionInput" value="5" min="0" step="0.01" placeholder="Montant payé par le client pour la livraison" oninput="calculateCost()">
         </div>
 
         <!-- Input for Desired Selling Price on Etsy -->
         <div class="input-group mb-6">
             <label for="desiredSellingPrice">Prix de vente désiré sur Etsy (€) :</label>
-            <input type="number" id="desiredSellingPrice" value="0" min="0" step="0.01" placeholder="Entrez le prix de vente désiré">
+            <input type="number" id="desiredSellingPrice" value="0" min="0" step="0.01" placeholder="Entrez le prix de vente désiré" oninput="calculateCost()">
         </div>
 
         <!-- Button to trigger calculation -->
@@ -117,10 +152,52 @@
             <button onclick="calculateCost()">Calculer le coût total</button>
         </div>
 
-        <div class="result flex flex-col items-center justify-center" id="costDetails">
-            <p>Taxes auto-entrepreneur : <span id="autoEntrepreneurTax">0.00 €</span></p>
-            <hr class="my-2 w-full border-gray-400">
-            <p>Coût total du produit : <span id="totalCost">0.00 €</span></p>
+        <!-- Interactive Summary Section -->
+        <div class="summary-card">
+            <h2 class="text-lg font-bold mb-4 text-center text-gray-700">Résumé des coûts</h2>
+            <p>
+                Coût Gelato : 
+                <span id="summaryGelatoCost">0.00 €</span>
+            </p>
+            <p>
+                Frais de transport : 
+                <span id="summaryShippingCost">0.00 €</span>
+            </p>
+            <p>
+                TVA (20%) : 
+                <span id="summaryVatCost">0.00 €</span>
+            </p>
+            <p>
+                <strong class="text-gray-700">Frais Etsy (détail) :</strong>
+            </p>
+            <p class="ml-4">
+                - Frais de transaction (6.5%) :
+                <span id="summaryEtsyTransactionFees">0.00 €</span>
+            </p>
+            <p class="ml-4">
+                - Frais de traitement des paiements (4% + 0.30) :
+                <span id="summaryEtsyPaymentFees">0.00 €</span>
+            </p>
+            <p class="ml-4">
+                - Frais d'exploitation réglementaires (0.47%) :
+                <span id="summaryEtsyRegulatoryFees">0.00 €</span>
+            </p>
+            <p class="ml-4">
+                - TVA sur les frais Etsy (20%) :
+                <span id="summaryEtsyVat">0.00 €</span>
+            </p>
+            <p>
+                Taxes Auto-Entrepreneur (12.8%) : 
+                <span id="summaryAutoTax">0.00 €</span>
+            </p>
+            <p>
+                Contribution livraison (reçue) : 
+                <span id="summaryBuyerContribution">-0.00 €</span>
+            </p>
+            <p class="total">
+                Coût total net : 
+                <span id="summaryTotalCost">0.00 €</span>
+            </p>
         </div>
     </div>
 
@@ -128,45 +205,72 @@
         /**
          * Calculates the total production cost of a product for Etsy,
          * considering Gelato production price, shipping, VAT, and Etsy fees.
-         * It also accounts for 5 euros of shipping fees paid by the buyer and auto-entrepreneur tax.
+         * It also accounts for the shipping fees paid by the buyer and auto-entrepreneur tax.
          */
         function calculateCost() {
             // Get input values from the DOM
             const gelatoPriceInput = document.getElementById('gelatoPrice');
             const shippingCostInput = document.getElementById('shippingCost');
+            const buyerShippingContributionInput = document.getElementById('buyerShippingContributionInput');
             const desiredSellingPriceInput = document.getElementById('desiredSellingPrice');
             
-            // Get result display elements
-            const autoEntrepreneurTaxSpan = document.getElementById('autoEntrepreneurTax');
-            const totalCostSpan = document.getElementById('totalCost');
+            // Get summary display elements
+            const summaryGelatoCost = document.getElementById('summaryGelatoCost');
+            const summaryShippingCost = document.getElementById('summaryShippingCost');
+            const summaryVatCost = document.getElementById('summaryVatCost');
+            const summaryEtsyTransactionFees = document.getElementById('summaryEtsyTransactionFees');
+            const summaryEtsyPaymentFees = document.getElementById('summaryEtsyPaymentFees');
+            const summaryEtsyRegulatoryFees = document.getElementById('summaryEtsyRegulatoryFees');
+            const summaryEtsyVat = document.getElementById('summaryEtsyVat');
+            const summaryAutoTax = document.getElementById('summaryAutoTax');
+            const summaryBuyerContribution = document.getElementById('summaryBuyerContribution');
+            const summaryTotalCost = document.getElementById('summaryTotalCost');
 
             // Parse input values as floats. Use 0 if input is invalid or empty.
             const gelatoPrice = parseFloat(gelatoPriceInput.value) || 0;
             const shippingCost = parseFloat(shippingCostInput.value) || 0;
             const desiredSellingPrice = parseFloat(desiredSellingPriceInput.value) || 0;
+            const buyerShippingContribution = parseFloat(buyerShippingContributionInput.value) || 0;
 
-            // Define the amount received from the buyer for shipping
-            const buyerShippingContribution = 5; // Euros received from the buyer for shipping
+            // Total revenue for Etsy's calculations
+            const totalRevenue = desiredSellingPrice + buyerShippingContribution;
 
             // Calculate VAT: 20% of the Gelato production price PLUS shipping cost
             const vat = (gelatoPrice + shippingCost) * 0.20;
 
-            // Calculate Etsy fees: 12% of the desired selling price PLUS 0.30 euros fixed fee
-            const etsyFees = (desiredSellingPrice * 0.12) + 0.30;
+            // Calculate detailed Etsy fees before VAT
+            const etsyTransactionFees = totalRevenue * 0.065;
+            const etsyPaymentProcessingFees = (totalRevenue * 0.04) + 0.30;
+            const etsyRegulatoryFees = (desiredSellingPrice + buyerShippingContribution) * 0.0047;
+
+            // Calculate VAT on all Etsy fees (assuming 20%)
+            const totalEtsyFeesBeforeVat = etsyTransactionFees + etsyPaymentProcessingFees + etsyRegulatoryFees;
+            const etsyFeesVat = totalEtsyFeesBeforeVat * 0.20;
+            
+            // Total Etsy fees including VAT
+            const totalEtsyFees = totalEtsyFeesBeforeVat + etsyFeesVat;
 
             // Calculate auto-entrepreneur tax: 12.8% of the desired selling price (revenue)
             const autoEntrepreneurTax = desiredSellingPrice * 0.128;
 
             // Calculate the total expenses before deducting buyer's contribution
-            const totalExpenses = gelatoPrice + shippingCost + vat + etsyFees + autoEntrepreneurTax;
+            const totalExpenses = gelatoPrice + shippingCost + vat + totalEtsyFees + autoEntrepreneurTax;
 
             // Calculate the final total cost of the product
             // Subtract the buyer's shipping contribution from the total expenses
             const totalCost = totalExpenses - buyerShippingContribution;
 
-            // Display the calculated tax and total cost, formatted to two decimal places
-            autoEntrepreneurTaxSpan.textContent = autoEntrepreneurTax.toFixed(2) + ' €';
-            totalCostSpan.textContent = totalCost.toFixed(2) + ' €';
+            // Update the interactive summary with the calculated values
+            summaryGelatoCost.textContent = gelatoPrice.toFixed(2) + ' €';
+            summaryShippingCost.textContent = shippingCost.toFixed(2) + ' €';
+            summaryVatCost.textContent = vat.toFixed(2) + ' €';
+            summaryEtsyTransactionFees.textContent = etsyTransactionFees.toFixed(2) + ' €';
+            summaryEtsyPaymentFees.textContent = etsyPaymentProcessingFees.toFixed(2) + ' €';
+            summaryEtsyRegulatoryFees.textContent = etsyRegulatoryFees.toFixed(2) + ' €';
+            summaryEtsyVat.textContent = etsyFeesVat.toFixed(2) + ' €';
+            summaryAutoTax.textContent = autoEntrepreneurTax.toFixed(2) + ' €';
+            summaryBuyerContribution.textContent = '-' + buyerShippingContribution.toFixed(2) + ' €';
+            summaryTotalCost.textContent = totalCost.toFixed(2) + ' €';
         }
 
         // Call calculateCost initially to display default values
