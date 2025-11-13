@@ -1,0 +1,246 @@
+/* e) */
+
+body {
+    margin: 0;
+    padding: 0;
+    font-family: sans-serif; /* Ajout d'une police par défaut pour la lisibilité */
+    overflow-x: hidden;
+}
+
+/* h) */
+/* Configuration de l'image principale "hero" */
+.hero-image {
+    height: 100vh;
+    background-image: url("../images/hero.jpg");
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+
+
+
+/* --- Scrollbar personnalisée --- */
+
+/* Scrollbar de la page entière pour Chrome, Edge, Safari */
+::-webkit-scrollbar-track {
+    background: #212529;
+    border-radius: 10px;
+}
+::-webkit-scrollbar-thumb {
+    border-radius: 10px;
+
+    /* j) */
+    background: #ffffff;
+
+}
+
+/* Scrollbar pour Firefox */
+* {
+    scrollbar-width: auto;
+    scrollbar-color: #ffffff #212529;
+}
+
+
+
+/* --- Style du header --- */
+.main-header {
+  background-color: #212529;
+  padding: 1rem;
+  position: sticky; /* L'en-tête reste collé en haut de l'écran lors du scroll */
+  top: 0;
+  z-index: 100; /* S'assure qu'il passe au-dessus des autres éléments */
+  justify-content: center; /* Centre le contenu */
+}
+
+
+
+/* --- Style de la barre de navigation du header --- */
+
+/* Applique la transition pour tous les éléments de la barre de navigation */
+.main-header nav ul li a{
+    transition: all 0.3s ease;
+}
+
+/* Style pour l'élément actif */
+.main-header nav ul li a.active {
+
+  /* j) */
+  background-color: white;
+
+  color: black;
+  border-radius: 10px; /* Arrondit les coins */
+  padding: 0.5rem 0.7rem; 
+}
+
+/* Style au survol de la souris */
+.main-header nav ul li a:hover {
+  background-color: white;
+  color: black;
+  border-radius: 10px;
+  padding: 0.5rem 1rem;
+
+}
+
+/* Structure de la barre de navigation */
+.main-header nav {
+
+  /* p) */
+  display: flex;
+
+  align-items: center;
+  justify-content: center;
+}
+
+/* Style pour les éléments texte dans la barre de navigation */
+.main-header nav ul {
+  list-style: none; 
+  margin: 0;
+  padding: 0;
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+}
+
+/* Style pour le texte dans le header */
+.main-header nav a {
+    color: white;
+    text-decoration: none;
+    font-weight: bold;
+}
+
+/* Syle pour le logo dans le header */
+.header-logo{
+  position: absolute;
+  left: 2rem;
+  height: 40px;
+  width: auto;
+}
+
+
+
+/* --- Style des sections --- */
+section {
+    padding: 2rem 1rem; /* Ajoute de l'espace à l'intérieur de chaque section */
+    border-bottom: 1px solid #212529; /* Sépare visuellement les sections */
+}
+
+
+
+/* --- Style pour les select --- */
+/* Apparence des select */
+select,
+select::picker(select) {
+	appearance: base-select;
+  padding: 0.5rem;
+	border: 1px solid #212529;
+	border-radius: 10px;
+	background-color: #212529;
+	color: #ffffff;
+  align-self: center;
+}
+
+select {
+	background-color: #212529;
+	color: rgb(255, 255, 255);
+}
+
+
+
+/* --- Scrollbar personnalisée pour le select --- */
+
+/* Scrollbar personnalisée pour Webkit */
+select::-webkit-scrollbar {
+    width: 10px;
+}
+
+select::-webkit-scrollbar-track {
+    background: #212529;
+    border-radius: 5px;
+}
+
+select::-webkit-scrollbar-thumb {
+    border-radius: 5px;
+    background: #ffffff;
+}
+
+/* Scrollbar pour Firefox */
+select {
+    scrollbar-width: thin;
+    scrollbar-color: #ffffff #212529;
+}
+
+
+
+/* --- Style des différentes sections --- */
+/* i) */
+#classements, #courses, #circuits, #pilotes {
+  display: flex; /* La section devient un conteneur flex */
+  flex-direction: column; /* Pour bien répartir les éléments */
+  gap: 20px; /* Ajoute un espace entre les divs */
+  padding: 2rem; /* Ajoute un peu d'air autour */
+
+  /* j) */
+  background-color: rgb(240, 240, 240);
+
+}
+
+
+
+/* --- Style des divs qui sont dans classements, courses, circuits et pilotes --- */
+#classements > div,
+#courses > div,
+#circuits > div,
+#pilotes > div {
+  flex: 1;
+  border: 1px solid #ddd;
+  padding: 1.5rem;
+  text-align: center;
+  background-color: white;
+}
+
+
+
+/* --- Style des div tab-container --- */
+.tab-container{
+  display: flex; /* Le div devient un conteneur flex */
+  justify-content: space-around; /* Pour bien répartir les éléments */
+  border: 1px solid #ddd;
+  padding: 1.5rem;
+  text-align: center;
+  background-color: white;
+  box-shadow: 0 2px 4px rgb(0,0,0); /* Ajoute une ombre */
+}
+
+
+
+/* --- Style des tableaux --- */
+
+/* Arrondir les angles */
+.table-rounded {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+/* Coins supérieurs */
+.table-rounded thead tr:first-child th:first-child {
+  border-top-left-radius: 1rem;
+}
+.table-rounded thead tr:first-child th:last-child {
+  border-top-right-radius: 1rem;
+}
+
+/* Coins inférieurs */
+.table-rounded tbody tr:last-child td:first-child {
+  border-bottom-left-radius: 1rem;
+}
+.table-rounded tbody tr:last-child td:last-child {
+  border-bottom-right-radius: 1rem;
+}
+
+table {
+    margin: 0 auto; /* Centre les tableaux horizontalement */
+}

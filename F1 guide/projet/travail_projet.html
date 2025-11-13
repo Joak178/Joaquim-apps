@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="fr">
+    <head>   <!-- Définition d'informations qui ne s'affichent pas sur la page -->
+
+        <!-- r) -->
+        <meta charset="utf-8" /> <!-- Conventions d'écriture pour assurer un affichage correct des caractères spéciaux -->
+        <meta name=”Description” content="Site web présentant en détail les statistiques principales de la F1 : Classements, résultats de courses, circuits et pilotes">
+
+        <link rel="stylesheet" href="../style/style.css" /> <!-- Lien avec la feuille de style en CSS -->
+
+        <!-- a) -->
+        <title>F1 guide</title> <!-- Titre de l'onglet -->  
+
+        <!-- o) -->
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"> <!-- Configuration du bootstrap -->
+
+        <!-- s) -->
+        <!-- Configuration du favicon avec une compatibilité maximale -->
+        <link rel="apple-touch-icon" sizes="180x180" href="../images/favicon/apple-touch-icon.png">
+        <link rel="icon" type="image/png" sizes="32x32" href="../images/favicon/favicon-32x32.png">
+        <link rel="icon" type="image/png" sizes="16x16" href="../images/favicon/favicon-16x16.png">
+        <link rel="manifest" href="../images/favicon/site.webmanifest">
+    </head>
+
+    <body> <!-- Corps de la page (contenu visible)-->
+
+        <section class="hero-image"> <!-- Image d'accueil -->
+
+            <!-- g) -->
+            <a style="color : white; text-decoration: none; font-size: xx-large; font-weight: bold;" href="#header">Start</a>
+
+        </section>
+
+        <main> <!-- Partie principale avec tout le reste du contenu -->
+
+            <!-- q) -->
+            <header class="main-header" id="header"> <!-- En-tête principal -->
+            
+                <nav>
+
+                    <!-- c) -->
+                    <img src="../images/F1_logo_sans_fond.png" alt="F1 Logo" class="header-logo">
+                    
+                    <ul>
+
+                        <!-- k) -->
+                        <li><a class="active" href="#header">Classements</a></li>
+                        <li><a href="courses.html#header">Courses</a></li>
+                        <li><a href="circuits.html#header">Circuits</a></li>
+                        <li><a href="pilotes.html#header">Pilotes</a></li>
+                        <li><a href="#contact">Contact</a></li>
+                    </ul>
+                </nav>
+            </header>
+
+            <section id="classements">
+                <select id="select-annee" name="annee"></select>
+
+                <div class="tab-container">
+
+                    <!-- o) -->
+                    <div class="table-responsive"> <!-- Classe qui référence le bootstrap --> 
+                        <h2>Classement pilotes</h2>
+                        <table class="table table-dark table-striped table-hover table-rounded"> <!-- Classe qui référence le bootstrap -->
+                            <caption>Classement pilotes</caption>
+                            <thead>
+                                <tr>
+                                    <th>Position</th>
+                                    <th>Pilote</th>
+                                    <th>Écurie</th>
+                                    <th>Points</th>
+                                    <th>Victoires</th>
+                                </tr>
+                            </thead>
+                            <tbody id="classement-pilotes">
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="table-responsive"> 
+                        <h2>Classement constructeurs</h2>
+
+                        <!-- n) -->
+                        <table class="table table-dark table-striped table-hover table-rounded">
+                            <caption>Classement constructeur</caption>
+                            <thead>
+                                <tr>
+                                    <th>Position</th>
+                                    <th>Constructeur</th>
+                                    <th>Points</th>
+                                    <th>Victoires</th>
+                                </tr>
+                            </thead>
+                            <tbody id="classement-constructeurs">
+                            </tbody>
+                        </table>
+                    </div>
+            </section>
+        </main>
+
+        <!-- q) -->
+        <footer id="contact">
+
+            <p>
+
+                <!-- m) -->
+                &copy; 2025 F1 Guide. Tous droits réservés. <a href="../CV_Joaquim_DAUBAGNA--LEFEBVRE.pdf" target="_blank">Lien vers mon CV →</a>
+
+            </p>
+        </footer>
+
+
+
+
+
+
+    
+        <script>
+
+            // --- Définition des variables d'URL globales (elles seront mises à jour dans l'événement 'change') ---
+            let DRIVERSTANDINGS_URL = '';
+            let CONSTRUCTORSTANDINGS_URL = '';
+ 
+            // Définition des options d'années pour le select annee
+            const anneeSelect = document.getElementById("select-annee"); 
+            const anneeCourante = new Date().getFullYear();
+
+            // Création des options pour le select annee
+            for (let i = 0; i <= anneeCourante-1950; i++) {
+                const option = document.createElement("option");
+                option.value = anneeCourante - i;
+                option.textContent = anneeCourante - i;
+                anneeSelect.appendChild(option);
+            }
+
+            // Écouteur d'événement pour le select annee
+            anneeSelect.addEventListener('change', function() {
+                const anneeChoisie = this.value;
+                mettreAJourClassements(anneeChoisie);
+            });
+
+
+            // Fonction pour mettre à jour les URLs et relancer l'affichage
+            function mettreAJourClassements(anneeChoisie) {
+                // 1. Mise à jour des variables d'URL globales
+                DRIVERSTANDINGS_URL = `https://corsproxy.io/?https://api.jolpi.ca/ergast/f1/${anneeChoisie}/driverstandings/`;
+                CONSTRUCTORSTANDINGS_URL = `https://corsproxy.io/?https://api.jolpi.ca/ergast/f1/${anneeChoisie}/constructorstandings/`;
+                
+                // 2. Appel des fonctions pour lancer l'affichage
+                afficherClassementPilotes();
+                afficherClassementConstructeurs();
+                console.log(`Nouvelle URL Pilotes : ${DRIVERSTANDINGS_URL}`);
+            }
+
+            
+            // ----------------------------------------------------------------------
+
+            function afficherClassementPilotes() {
+                const tbodyResultats = document.getElementById('classement-pilotes');
+                
+                // Vider le tableau existant avant de charger de nouvelles données
+                tbodyResultats.innerHTML = ''; 
+
+                // Requête Fetch pour récupérer les données
+                fetch(DRIVERSTANDINGS_URL)
+                    .then(response => response.json())
+                    .then(data => {
+                        // Récupération des données
+                        const standingsList = data.MRData.StandingsTable.StandingsLists[0];
+                        const pilotes = standingsList.DriverStandings;
+
+                        // Boucle et affichage
+                        pilotes.forEach(pilote => {
+                            const ligne = tbodyResultats.insertRow();
+                            const nomComplet = `${pilote.Driver.givenName} ${pilote.Driver.familyName}`;
+                            
+                            const donnees = [
+                                pilote.position, 
+                                nomComplet,
+                                pilote.Constructors[0].name,
+                                pilote.points, 
+                                pilote.wins
+                            ];
+                            
+                            donnees.forEach(donnee => {
+                                let cellule = ligne.insertCell();
+                                cellule.textContent = donnee;
+                            });
+                        });
+                    })
+                    .catch(error => {
+                        console.error("Erreur lors de la récupération des classements pilotes:", error);
+                        tbodyResultats.innerHTML = '<tr><td colspan="4" style="color: red;">Erreur de chargement des données.</td></tr>';
+                    });
+            }
+
+            // ----------------------------------------------------------------------
+
+            function afficherClassementConstructeurs() {
+                const tbodyResultats = document.getElementById('classement-constructeurs');
+                
+                // Vider le tableau existant
+                tbodyResultats.innerHTML = ''; 
+
+                // Requête Fetch
+                fetch(CONSTRUCTORSTANDINGS_URL) // **CORRECTION : Utiliser la variable globale**
+                    .then(response => response.json())
+                    .then(data => {
+                        // Récupération des données
+                        const standingsList = data.MRData.StandingsTable.StandingsLists[0];
+                        const constructeurs = standingsList.ConstructorStandings;
+
+                        // Boucle et affichage
+                        constructeurs.forEach(constructeur => {
+                            const ligne = tbodyResultats.insertRow();
+                            
+                            const donnees = [
+                                constructeur.position, 
+                                constructeur.Constructor.name,
+                                constructeur.points, 
+                                constructeur.wins
+                            ];
+
+                            donnees.forEach(donnee => {
+                                let cellule = ligne.insertCell();
+                                cellule.textContent = donnee;
+                            });
+                        });
+                    })
+                    .catch(error => {
+                        console.error("Erreur lors de la récupération des classements constructeurs:", error);
+
+                        // n)
+                        tbodyResultats.innerHTML = '<tr><td colspan="4" style="color: red;">Erreur de chargement des données.</td></tr>';
+
+                    });
+            }
+
+            // --- Appel Initial au chargement de la page ---
+            // Lancer l'affichage initial avec la valeur par défaut du select (l'année courante)
+            window.onload = function() {
+                if (anneeSelect.value) {
+                    mettreAJourClassements(anneeSelect.value);
+                }
+            }
+
+        </script>
+    </body>
+</html>
