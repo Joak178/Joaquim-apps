@@ -18,11 +18,17 @@
         
         /* --- STYLE VERRE --- */
         .glass-panel {
-            background: rgba(20, 20, 35, 0.6);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            /* Plus transparent avec un dégradé pour un effet liquide et réfléchissant */
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.02) 100%);
+            /* Flou d'arrière-plan plus important pour un effet verre plus épais */
+            backdrop-filter: blur(25px);
+            -webkit-backdrop-filter: blur(25px);
+            /* Bordure légèrement plus marquée */
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            /* Ombre portée plus profonde et ajout d'un reflet interne (inset) en haut */
+            box-shadow: 
+                0 8px 32px 0 rgba(0, 0, 0, 0.4),
+                inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
             border-radius: 16px;
             transition: all 0.3s ease;
         }
@@ -78,42 +84,46 @@
         <!-- BAS : Contrôles & Playlist -->
         <div class="glass-panel p-6 rounded-2xl pointer-events-auto flex flex-col items-center gap-5 fade-in w-full max-w-md mb-8 border-t border-white/20 relative">
             
-            <!-- BOUTON IMPORT (Top Right Absolute) -->
-            <label class="absolute top-4 right-4 cursor-pointer text-white/50 hover:text-white transition transform hover:scale-110 active:scale-95 z-20 p-2" title="Importer des fichiers audio">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                </svg>
-                <input type="file" id="audio-input" accept="audio/*" multiple>
-            </label>
-
-            <!-- Contrôles de lecture -->
-            <div class="flex items-center justify-center gap-4 w-full mt-2">
+            <!-- Zone Contrôles (Relative pour permettre l'absolute du bouton import) -->
+            <div class="relative flex items-center justify-center w-full mt-2">
                 
-                <!-- Précédent -->
-                <button id="prev-btn" class="text-gray-400 hover:text-white transition transform active:scale-90 p-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
-                    </svg>
-                </button>
+                <!-- Groupe Central : Précédent / Play / Suivant -->
+                <div class="flex items-center justify-center gap-4">
+                    <!-- Précédent -->
+                    <button id="prev-btn" class="text-gray-400 hover:text-white transition transform active:scale-90 p-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                        </svg>
+                    </button>
 
-                <!-- Play/Pause (Style Rectangulaire Arrondi) -->
-                <button id="play-btn" disabled class="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold py-3 px-8 rounded-xl transition transform hover:scale-105 active:scale-95 shadow-lg flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed min-w-[160px]">
-                    <svg id="play-icon" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <svg id="pause-icon" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6" />
-                    </svg>
-                    <span id="play-text" class="text-sm tracking-widest uppercase">Lecture</span>
-                </button>
+                    <!-- Play/Pause (Taille fixe w-40) -->
+                    <button id="play-btn" disabled class="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold py-3 px-0 w-40 rounded-xl transition transform hover:scale-105 active:scale-95 shadow-lg flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed">
+                        <svg id="play-icon" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <svg id="pause-icon" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6" />
+                        </svg>
+                        <span id="play-text" class="text-sm tracking-widest uppercase">PLAY</span>
+                    </button>
 
-                <!-- Suivant -->
-                <button id="next-btn" class="text-gray-400 hover:text-white transition transform active:scale-90 p-2">
+                    <!-- Suivant -->
+                    <button id="next-btn" class="text-gray-400 hover:text-white transition transform active:scale-90 p-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- BOUTON IMPORT (Positionné Absolument à Droite) -->
+                <label class="absolute right-0 cursor-pointer text-gray-400 hover:text-white transition transform hover:scale-110 active:scale-95 p-2" title="Importer des fichiers audio">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                     </svg>
-                </button>
+                    <input type="file" id="audio-input" accept="audio/*" multiple>
+                </label>
+
             </div>
 
             <!-- Barre de progression -->
@@ -126,7 +136,7 @@
                 </div>
             </div>
 
-            <audio id="audio-element" class="hidden"></audio>
+            <audio id="audio-element" class="hidden" crossorigin="anonymous"></audio>
         </div>
     </div>
 
@@ -150,6 +160,7 @@
         let isPlaying = false;
         
         // Playlist Logic
+        // Playlist vide par défaut
         let playlist = [];
         let currentTrackIndex = 0;
 
@@ -216,7 +227,11 @@
                 else if(aFreqIndex < 1.5) intensity = uMid;
                 else intensity = uHigh;
                 float personalMultiplier = 0.8 + (aRandom * 0.4); 
-                float expansion = pow(intensity, 2.0) * 300.0 * personalMultiplier; 
+                
+                // Modification : Réduction du facteur "explosif" (150.0 au lieu de 600.0)
+                // On garde pow(..., 3.0) pour que la réaction soit très ciblée sur les pics forts (percussions)
+                float expansion = pow(intensity, 3.0) * 150.0 * personalMultiplier; 
+                
                 gl_PointSize = (uBaseSize + expansion) * (300.0 / -mvPosition.z);
                 gl_Position = projectionMatrix * mvPosition;
             }
@@ -251,7 +266,11 @@
                 uv.x = uv.x + (col * 0.25);
                 uv.y = uv.y + ((3.0 - row) * 0.25); 
                 vec4 texColor = texture2D(pointTexture, uv);
-                float brightness = 0.6 + (intensity * 0.4);
+                
+                // Modification : Retour à une luminosité stable et douce
+                // On enlève l'effet de clignotement drastique
+                float brightness = 0.8 + (intensity * 0.3);
+                
                 gl_FragColor = vec4(color * vColor * brightness, 1.0) * texColor;
                 if (gl_FragColor.a < 0.01) discard;
             }
@@ -293,7 +312,7 @@
             animate();
         }
 
-        // --- GÉNÉRATEUR D'ATLAS HD (pour de belles particules) ---
+        // --- GÉNÉRATEUR D'ATLAS HD ---
         function getSpriteAtlas() {
             const atlasSize = 2048; const cellSize = 512;
             const canvas = document.createElement('canvas');
@@ -351,7 +370,9 @@
             const material = new THREE.ShaderMaterial({
                 uniforms: {
                     color: { value: new THREE.Color(0xffffff) }, pointTexture: { value: getSpriteAtlas() },
-                    uBass: { value: 0.0 }, uMid: { value: 0.0 }, uHigh: { value: 0.0 }, uBaseSize: { value: 120.0 } 
+                    uBass: { value: 0.0 }, uMid: { value: 0.0 }, uHigh: { value: 0.0 }, 
+                    // Taille de base réduite conservée (40.0)
+                    uBaseSize: { value: 40.0 } 
                 },
                 vertexShader: vertexShader, fragmentShader: fragmentShader,
                 blending: THREE.AdditiveBlending, depthTest: false, transparent: true
@@ -363,22 +384,39 @@
         // --- GESTION AUDIO & PLAYLIST ---
         function setupAudioContext() {
             if (isAudioSetup) return;
-            const AudioContext = window.AudioContext || window.webkitAudioContext;
-            audioContext = new AudioContext();
-            analyser = audioContext.createAnalyser();
-            analyser.fftSize = 1024; 
-            const bufferLength = analyser.frequencyBinCount;
-            dataArray = new Uint8Array(bufferLength);
-            source = audioContext.createMediaElementSource(audioElement);
-            source.connect(analyser);
-            analyser.connect(audioContext.destination);
-            isAudioSetup = true;
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioContext = new AudioContext();
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 1024; 
+                const bufferLength = analyser.frequencyBinCount;
+                dataArray = new Uint8Array(bufferLength);
+                
+                // TENTATIVE DE CONNEXION AUDIO
+                source = audioContext.createMediaElementSource(audioElement);
+                source.connect(analyser);
+                analyser.connect(audioContext.destination);
+                isAudioSetup = true;
+            } catch (e) {
+                console.warn("L'AudioContext a échoué (CORS ou fichier local). La musique jouera sans visualiseur.", e);
+                // On laisse couler l'erreur pour que la musique puisse quand même être jouée par le navigateur
+                // sans passer par le visualiseur.
+                isAudioSetup = false; 
+            }
         }
 
-        function loadTrack(index) {
+        function loadTrack(index, autoPlay = true) {
             if (index < 0 || index >= playlist.length) return;
             currentTrackIndex = index;
             const track = playlist[index];
+            
+            // Gestion d'erreurs chargement UI
+            audioElement.onerror = function() {
+                console.error("Erreur de chargement du fichier audio : " + track.url);
+                trackTitleEl.textContent = "Erreur : " + track.title;
+                trackInfoEl.textContent = "Fichier inaccessible. Importez-le manuellement.";
+            };
+
             audioElement.src = track.url;
             trackTitleEl.textContent = track.title;
             trackInfoEl.textContent = `Piste ${index + 1} / ${playlist.length}`;
@@ -386,38 +424,61 @@
             progressBar.value = 0;
             updateSliderBackground(0);
             currentTimeEl.textContent = "00:00";
-            togglePlay(true);
-            if (!isAudioSetup) setupAudioContext();
+            
+            if (autoPlay) {
+                togglePlay(true);
+            } else {
+                playIcon.classList.remove('hidden'); 
+                pauseIcon.classList.add('hidden');
+                playText.textContent = "PLAY";
+                isPlaying = false;
+            }
+
+            // On essaie de configurer le contexte audio si ce n'est pas fait
+            if (!isAudioSetup && autoPlay) setupAudioContext();
         }
 
         function playNext() {
             if (playlist.length === 0) return;
             let nextIndex = currentTrackIndex + 1;
             if (nextIndex >= playlist.length) nextIndex = 0;
-            loadTrack(nextIndex);
+            loadTrack(nextIndex, true);
         }
 
         function playPrev() {
             if (playlist.length === 0) return;
             let prevIndex = currentTrackIndex - 1;
             if (prevIndex < 0) prevIndex = playlist.length - 1;
-            loadTrack(prevIndex);
+            loadTrack(prevIndex, true);
         }
 
         function togglePlay(forcePlay = false) {
-            if (audioContext && audioContext.state === 'suspended') audioContext.resume();
-            if (forcePlay === true) {
-                audioElement.play(); isPlaying = true;
-            } else {
-                if (isPlaying) { audioElement.pause(); isPlaying = false; } 
-                else { audioElement.play(); isPlaying = true; }
+            // Tenter de démarrer le contexte audio (nécessaire pour le visualiseur)
+            if (!isAudioSetup) setupAudioContext();
+            
+            if (audioContext && audioContext.state === 'suspended') {
+                audioContext.resume().catch(e => console.log("Impossible de reprendre l'AudioContext", e));
             }
+            
+            if (forcePlay === true) {
+                audioElement.play().catch(e => console.log("Lecture auto bloquée par le navigateur:", e));
+                isPlaying = true;
+            } else {
+                if (isPlaying) { 
+                    audioElement.pause(); 
+                    isPlaying = false; 
+                } else { 
+                    audioElement.play().catch(e => console.log("Lecture bloquée:", e)); 
+                    isPlaying = true; 
+                }
+            }
+            
             if (isPlaying) {
                 playIcon.classList.add('hidden'); pauseIcon.classList.remove('hidden');
                 playText.textContent = "PAUSE";
             } else {
                 playIcon.classList.remove('hidden'); pauseIcon.classList.add('hidden');
-                playText.textContent = "LECTURE";
+                playText.textContent = "PLAY";
             }
         }
 
@@ -428,11 +489,13 @@
         audioInput.addEventListener('change', function(e) {
             const files = Array.from(e.target.files);
             if (files.length === 0) return;
+            
             files.forEach(file => {
                 const name = file.name.replace(/\.[^/.]+$/, "");
                 playlist.push({ title: name, url: URL.createObjectURL(file) });
             });
-            if (playlist.length === files.length) loadTrack(0);
+            
+            if (playlist.length === files.length) loadTrack(0, true);
             else trackInfoEl.textContent = `Piste ${currentTrackIndex + 1} / ${playlist.length}`;
         });
 
@@ -486,6 +549,7 @@
             let bassIntensity = 0; let midIntensity = 0; let highIntensity = 0;
             const time = Date.now() * 0.001; 
             
+            // Lecture des données audio UNIQUEMENT si le setup a réussi
             if (isAudioSetup && isPlaying && analyser) {
                 analyser.getByteFrequencyData(dataArray);
                 let bTotal = 0; for(let i=0; i<20; i++) bTotal += dataArray[i]; bassIntensity = (bTotal / 20) / 255; 
