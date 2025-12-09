@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voyage Audio 3D</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #010103; color: white; font-family: 'Segoe UI', sans-serif; }
+        canvas { display: block; }
+        .fade-in { animation: fadeIn 0.5s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        input[type="file"] { display: none; }
+        
+        /* --- STYLE VERRE --- */
+        .glass-panel {
+            /* Plus transparent avec un dégradé pour un effet liquide et réfléchissant */
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.02) 100%);
+            /* Flou d'arrière-plan plus important pour un effet verre plus épais */
+            backdrop-filter: blur(25px);
+            -webkit-backdrop-filter: blur(25px);
+            /* Bordure légèrement plus marquée */
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            /* Ombre portée plus profonde et ajout d'un reflet interne (inset) en haut */
+            box-shadow: 
+                0 8px 32px 0 rgba(0, 0, 0, 0.4),
+                inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            transition: all 0.3s ease;
+        }
+
+        /* --- Slider Stylisé --- */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+            height: 4px;
+            border-radius: 2px;
+            cursor: pointer;
+            outline: none;
+        }
+        
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            background: transparent;
+            border-radius: 2px;
+            border: none;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 12px;
+            width: 12px;
+            border-radius: 50%;
+            background: #ffffff;
+            margin-top: -4px;
+            box-shadow: 0 0 10px rgba(96, 165, 250, 1);
+            transition: transform 0.1s ease;
+        }
+
+        input[type=range]:hover::-webkit-slider-thumb {
+            transform: scale(1.3);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- UI Container -->
+    <div id="ui-container" class="absolute top-0 left-0 w-full h-full pointer-events-none flex flex-col justify-between items-center p-6 z-10 transition-opacity duration-500">
+        
+        <!-- HAUT : Titre de la Musique -->
+        <div class="glass-panel px-6 py-3 rounded-full pointer-events-auto fade-in mt-4 max-w-xl text-center border-t border-white/20">
+            <h2 id="track-title" class="text-lg font-bold text-white tracking-wider truncate drop-shadow-md">
+                Aucune musique
+            </h2>
+            <p id="track-info" class="text-blue-300 text-xs uppercase tracking-widest mt-0.5">Playlist vide</p>
+        </div>
+
+        <!-- BAS : Contrôles & Playlist -->
+        <div class="glass-panel p-6 rounded-2xl pointer-events-auto flex flex-col items-center gap-5 fade-in w-full max-w-md mb-8 border-t border-white/20 relative">
+            
+            <!-- Zone Contrôles (Relative pour permettre l'absolute du bouton import) -->
+            <div class="relative flex items-center justify-center w-full mt-2">
+                
+                <!-- Groupe Central : Précédent / Play / Suivant -->
+                <div class="flex items-center justify-center gap-4">
+                    <!-- Précédent -->
+                    <button id="prev-btn" class="text-gray-400 hover:text-white transition transform active:scale-90 p-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                        </svg>
+                    </button>
+
+                    <!-- Play/Pause (Taille fixe w-40) -->
+                    <button id="play-btn" disabled class="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold py-3 px-0 w-40 rounded-xl transition transform hover:scale-105 active:scale-95 shadow-lg flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed">
+                        <svg id="play-icon" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <svg id="pause-icon" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6" />
+                        </svg>
+                        <span id="play-text" class="text-sm tracking-widest uppercase">PLAY</span>
+                    </button>
+
+                    <!-- Suivant -->
+                    <button id="next-btn" class="text-gray-400 hover:text-white transition transform active:scale-90 p-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- BOUTON IMPORT (Positionné Absolument à Droite) -->
+                <label class="absolute right-0 cursor-pointer text-gray-400 hover:text-white transition transform hover:scale-110 active:scale-95 p-2" title="Importer des fichiers audio">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                    </svg>
+                    <input type="file" id="audio-input" accept="audio/*" multiple>
+                </label>
+
+            </div>
+
+            <!-- Barre de progression -->
+            <div class="w-full flex flex-col gap-1 px-1 mt-1">
+                <input type="range" id="progress-bar" value="0" min="0" step="0.1" class="w-full mb-0" style="background: rgba(255, 255, 255, 0.1);">
+                
+                <div class="flex justify-between font-sans text-[10px] tracking-widest font-bold uppercase mt-1 text-gray-400">
+                    <span id="current-time">00:00</span>
+                    <span id="total-duration">00:00</span>
+                </div>
+            </div>
+
+            <audio id="audio-element" class="hidden" crossorigin="anonymous"></audio>
+        </div>
+    </div>
+
+    <!-- 3D Canvas -->
+    <div id="canvas-container" class="absolute top-0 left-0 w-full h-full z-0"></div>
+
+    <script>
+        // --- CONFIGURATION ---
+        const PARTICLE_COUNT = 2500; 
+        const SPACE_WIDTH = 10000;   
+        const SPACE_DEPTH = 5000;
+        
+        // --- VARIABLES GLOBALES ---
+        let scene, camera, renderer;
+        let particles, geometry;
+        let originalPositions; 
+        let randomOffsets; 
+        
+        let audioContext, analyser, dataArray, source;
+        let isAudioSetup = false;
+        let isPlaying = false;
+        
+        // Playlist Logic
+        // Playlist vide par défaut
+        let playlist = [];
+        let currentTrackIndex = 0;
+
+        let beatCounter = 0;
+        let lastBeatTime = 0;
+        let beatThreshold = 0.6; 
+        
+        // Pilotage
+        let mousePosition = { x: 0, y: 0 };
+        let autoDrift = { x: 0, y: 0 };
+        let autoRoll = 0;               
+        
+        // VITESSE & INERTIE
+        let baseSpeed = 0.1; 
+        let currentSpeed = baseSpeed;
+        
+        // Valeurs Audio
+        let smoothedBass = 0; 
+        let smoothedMid = 0; 
+        let smoothedHigh = 0;
+        
+        let pulseBass = 0;   
+        let pulseMid = 0;
+        let pulseHigh = 0;
+
+        // UI Elements
+        const trackTitleEl = document.getElementById('track-title');
+        const trackInfoEl = document.getElementById('track-info');
+        const playBtn = document.getElementById('play-btn');
+        const playText = document.getElementById('play-text');
+        const playIcon = document.getElementById('play-icon');
+        const pauseIcon = document.getElementById('pause-icon');
+        const prevBtn = document.getElementById('prev-btn');
+        const nextBtn = document.getElementById('next-btn');
+        const audioInput = document.getElementById('audio-input');
+        const audioElement = document.getElementById('audio-element');
+        const progressBar = document.getElementById('progress-bar');
+        const currentTimeEl = document.getElementById('current-time');
+        const totalDurationEl = document.getElementById('total-duration');
+
+        // --- SHADERS GLSL ---
+        const vertexShader = `
+            attribute float size;
+            attribute vec3 customColor;
+            attribute float aFreqIndex;
+            attribute float aRandom;
+            attribute float aSpriteIndex; 
+            varying vec3 vColor;
+            varying float vFreqIndex;
+            varying float vRandom;
+            varying float vSpriteIndex;
+            uniform float uBass;
+            uniform float uMid;
+            uniform float uHigh;
+            uniform float uBaseSize;
+            void main() {
+                vColor = customColor;
+                vFreqIndex = aFreqIndex;
+                vRandom = aRandom;
+                vSpriteIndex = aSpriteIndex;
+                vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+                float intensity = 0.0;
+                if(aFreqIndex < 0.5) intensity = uBass;
+                else if(aFreqIndex < 1.5) intensity = uMid;
+                else intensity = uHigh;
+                float personalMultiplier = 0.8 + (aRandom * 0.4); 
+                
+                // Modification : Réduction du facteur "explosif" (150.0 au lieu de 600.0)
+                // On garde pow(..., 3.0) pour que la réaction soit très ciblée sur les pics forts (percussions)
+                float expansion = pow(intensity, 3.0) * 150.0 * personalMultiplier; 
+                
+                gl_PointSize = (uBaseSize + expansion) * (300.0 / -mvPosition.z);
+                gl_Position = projectionMatrix * mvPosition;
+            }
+        `;
+
+        const fragmentShader = `
+            uniform vec3 color;
+            uniform sampler2D pointTexture;
+            uniform float uBass;
+            uniform float uMid;
+            uniform float uHigh;
+            varying vec3 vColor;
+            varying float vFreqIndex;
+            varying float vRandom;
+            varying float vSpriteIndex;
+            void main() {
+                vec2 uv = gl_PointCoord;
+                float intensity = 0.0;
+                if(vFreqIndex < 0.5) intensity = uBass;
+                else if(vFreqIndex < 1.5) intensity = uMid;
+                else intensity = uHigh;
+                vec2 center = vec2(0.5, 0.5);
+                vec2 centered = uv - center;
+                float reaction = intensity * (2.5 + vRandom);
+                float internalExpansion = 1.0 + reaction; 
+                centered /= internalExpansion;
+                uv = centered + center;
+                float index = floor(vSpriteIndex);
+                float col = mod(index, 4.0);
+                float row = floor(index / 4.0);
+                uv = uv / 4.0;
+                uv.x = uv.x + (col * 0.25);
+                uv.y = uv.y + ((3.0 - row) * 0.25); 
+                vec4 texColor = texture2D(pointTexture, uv);
+                
+                // Modification : Retour à une luminosité stable et douce
+                // On enlève l'effet de clignotement drastique
+                float brightness = 0.8 + (intensity * 0.3);
+                
+                gl_FragColor = vec4(color * vColor * brightness, 1.0) * texColor;
+                if (gl_FragColor.a < 0.01) discard;
+            }
+        `;
+
+        function initThree() {
+            const container = document.getElementById('canvas-container');
+
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x010103, 0.0003);
+
+            camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 1, 8000);
+            camera.position.z = 0;
+
+            renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); 
+            container.appendChild(renderer.domElement);
+
+            createSpaceField();
+
+            window.addEventListener('resize', onWindowResize, false);
+            document.addEventListener('mousemove', onDocumentMouseMove, false);
+            
+            // Touche F pour fullscreen/toggle UI
+            document.addEventListener('keydown', function(event) {
+                if (event.key === 'f' || event.key === 'F') {
+                    const ui = document.getElementById('ui-container');
+                    if (ui.style.display !== 'none') {
+                        ui.style.display = 'none';
+                        document.body.style.cursor = 'none';
+                    } else {
+                        ui.style.display = 'flex';
+                        document.body.style.cursor = 'auto';
+                    }
+                }
+            });
+
+            animate();
+        }
+
+        // --- GÉNÉRATEUR D'ATLAS HD ---
+        function getSpriteAtlas() {
+            const atlasSize = 2048; const cellSize = 512;
+            const canvas = document.createElement('canvas');
+            canvas.width = atlasSize; canvas.height = atlasSize;
+            const context = canvas.getContext('2d');
+            context.clearRect(0, 0, atlasSize, atlasSize);
+            for (let row = 0; row < 4; row++) {
+                for (let col = 0; col < 4; col++) {
+                    const startX = col * cellSize; const startY = row * cellSize;
+                    const centerX = startX + cellSize / 2; const centerY = startY + cellSize / 2;
+                    const maxRadius = cellSize / 4.0; 
+                    const dotCount = 400; const concentrationPower = 1.2 + Math.random() * 0.8; 
+                    for(let i = 0; i < dotCount; i++) {
+                        const distFactor = Math.pow(Math.random(), concentrationPower); 
+                        const radius = distFactor * maxRadius;
+                        const angle = Math.random() * Math.PI * 2;
+                        const x = centerX + Math.cos(angle) * radius; const y = centerY + Math.sin(angle) * radius;
+                        const dotSize = 0.5 + Math.random() * 2.5; 
+                        context.beginPath(); context.arc(x, y, dotSize, 0, Math.PI * 2);
+                        const opacity = 0.3 + (1 - distFactor) * 0.7;
+                        context.fillStyle = `rgba(255, 255, 255, ${opacity})`; context.fill();
+                    }
+                    const coreSize = 3 + Math.random() * 2;
+                    context.beginPath(); context.arc(centerX, centerY, coreSize, 0, Math.PI * 2);
+                    context.fillStyle = 'rgba(255, 255, 255, 1)'; context.fill();
+                }
+            }
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.wrapS = THREE.ClampToEdgeWrapping; tex.wrapT = THREE.ClampToEdgeWrapping;
+            tex.minFilter = THREE.LinearFilter; tex.magFilter = THREE.LinearFilter;
+            return tex;
+        }
+
+        function createSpaceField() {
+            geometry = new THREE.BufferGeometry();
+            const positions = []; const colors = []; const freqIndices = []; const randoms = []; const spriteIndices = []; const rOffsets = []; const colorObj = new THREE.Color();
+            const maxZ = 2000; const spawnZ = -SPACE_DEPTH + 1000; const depthRange = maxZ - spawnZ;   
+            for (let i = 0; i < PARTICLE_COUNT; i++) {
+                const x = (Math.random() - 0.5) * SPACE_WIDTH; const y = (Math.random() - 0.5) * SPACE_WIDTH; const z = maxZ - Math.random() * depthRange; 
+                positions.push(x, y, z); rOffsets.push(Math.random() - 0.5);
+                const r = Math.random();
+                let fIndex = 0; if (r > 0.5) fIndex = 1; if (r > 0.8) fIndex = 2; 
+                freqIndices.push(fIndex); randoms.push(Math.random()); spriteIndices.push(Math.floor(Math.random() * 16));
+                let hue = 0.6; if(fIndex === 0) hue = 0.6 + (Math.random() * 0.1); 
+                if(fIndex === 1) hue = 0.75 + (Math.random() * 0.1); if(fIndex === 2) hue = 0.5 + (Math.random() * 0.1);  
+                const saturation = 0.6 + (Math.random() * 0.4); const lightness = 0.4 + (Math.random() * 0.3);
+                colorObj.setHSL(hue, saturation, lightness); colors.push(colorObj.r, colorObj.g, colorObj.b);
+            }
+            geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+            geometry.setAttribute('customColor', new THREE.Float32BufferAttribute(colors, 3));
+            geometry.setAttribute('aFreqIndex', new THREE.Float32BufferAttribute(freqIndices, 1));
+            geometry.setAttribute('aRandom', new THREE.Float32BufferAttribute(randoms, 1));
+            geometry.setAttribute('aSpriteIndex', new THREE.Float32BufferAttribute(spriteIndices, 1));
+            originalPositions = Float32Array.from(positions); randomOffsets = Float32Array.from(rOffsets); 
+            const material = new THREE.ShaderMaterial({
+                uniforms: {
+                    color: { value: new THREE.Color(0xffffff) }, pointTexture: { value: getSpriteAtlas() },
+                    uBass: { value: 0.0 }, uMid: { value: 0.0 }, uHigh: { value: 0.0 }, 
+                    // Taille de base réduite conservée (40.0)
+                    uBaseSize: { value: 40.0 } 
+                },
+                vertexShader: vertexShader, fragmentShader: fragmentShader,
+                blending: THREE.AdditiveBlending, depthTest: false, transparent: true
+            });
+            particles = new THREE.Points(geometry, material); particles.frustumCulled = false; 
+            scene.add(particles);
+        }
+
+        // --- GESTION AUDIO & PLAYLIST ---
+        function setupAudioContext() {
+            if (isAudioSetup) return;
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioContext = new AudioContext();
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 1024; 
+                const bufferLength = analyser.frequencyBinCount;
+                dataArray = new Uint8Array(bufferLength);
+                
+                // TENTATIVE DE CONNEXION AUDIO
+                source = audioContext.createMediaElementSource(audioElement);
+                source.connect(analyser);
+                analyser.connect(audioContext.destination);
+                isAudioSetup = true;
+            } catch (e) {
+                console.warn("L'AudioContext a échoué (CORS ou fichier local). La musique jouera sans visualiseur.", e);
+                // On laisse couler l'erreur pour que la musique puisse quand même être jouée par le navigateur
+                // sans passer par le visualiseur.
+                isAudioSetup = false; 
+            }
+        }
+
+        function loadTrack(index, autoPlay = true) {
+            if (index < 0 || index >= playlist.length) return;
+            currentTrackIndex = index;
+            const track = playlist[index];
+            
+            // Gestion d'erreurs chargement UI
+            audioElement.onerror = function() {
+                console.error("Erreur de chargement du fichier audio : " + track.url);
+                trackTitleEl.textContent = "Erreur : " + track.title;
+                trackInfoEl.textContent = "Fichier inaccessible. Importez-le manuellement.";
+            };
+
+            audioElement.src = track.url;
+            trackTitleEl.textContent = track.title;
+            trackInfoEl.textContent = `Piste ${index + 1} / ${playlist.length}`;
+            playBtn.disabled = false;
+            progressBar.value = 0;
+            updateSliderBackground(0);
+            currentTimeEl.textContent = "00:00";
+            
+            if (autoPlay) {
+                togglePlay(true);
+            } else {
+                playIcon.classList.remove('hidden'); 
+                pauseIcon.classList.add('hidden');
+                playText.textContent = "PLAY";
+                isPlaying = false;
+            }
+
+            // On essaie de configurer le contexte audio si ce n'est pas fait
+            if (!isAudioSetup && autoPlay) setupAudioContext();
+        }
+
+        function playNext() {
+            if (playlist.length === 0) return;
+            let nextIndex = currentTrackIndex + 1;
+            if (nextIndex >= playlist.length) nextIndex = 0;
+            loadTrack(nextIndex, true);
+        }
+
+        function playPrev() {
+            if (playlist.length === 0) return;
+            let prevIndex = currentTrackIndex - 1;
+            if (prevIndex < 0) prevIndex = playlist.length - 1;
+            loadTrack(prevIndex, true);
+        }
+
+        function togglePlay(forcePlay = false) {
+            // Tenter de démarrer le contexte audio (nécessaire pour le visualiseur)
+            if (!isAudioSetup) setupAudioContext();
+            
+            if (audioContext && audioContext.state === 'suspended') {
+                audioContext.resume().catch(e => console.log("Impossible de reprendre l'AudioContext", e));
+            }
+            
+            if (forcePlay === true) {
+                audioElement.play().catch(e => console.log("Lecture auto bloquée par le navigateur:", e));
+                isPlaying = true;
+            } else {
+                if (isPlaying) { 
+                    audioElement.pause(); 
+                    isPlaying = false; 
+                } else { 
+                    audioElement.play().catch(e => console.log("Lecture bloquée:", e)); 
+                    isPlaying = true; 
+                }
+            }
+            
+            if (isPlaying) {
+                playIcon.classList.add('hidden'); pauseIcon.classList.remove('hidden');
+                playText.textContent = "PAUSE";
+            } else {
+                playIcon.classList.remove('hidden'); pauseIcon.classList.add('hidden');
+                playText.textContent = "PLAY";
+            }
+        }
+
+        playBtn.addEventListener('click', () => togglePlay());
+        nextBtn.addEventListener('click', playNext);
+        prevBtn.addEventListener('click', playPrev);
+
+        audioInput.addEventListener('change', function(e) {
+            const files = Array.from(e.target.files);
+            if (files.length === 0) return;
+            
+            files.forEach(file => {
+                const name = file.name.replace(/\.[^/.]+$/, "");
+                playlist.push({ title: name, url: URL.createObjectURL(file) });
+            });
+            
+            if (playlist.length === files.length) loadTrack(0, true);
+            else trackInfoEl.textContent = `Piste ${currentTrackIndex + 1} / ${playlist.length}`;
+        });
+
+        // UI Updates
+        function formatTime(seconds) {
+            if (!seconds || isNaN(seconds)) return "00:00";
+            const m = Math.floor(seconds / 60); const s = Math.floor(seconds % 60);
+            return `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
+        }
+
+        function updateSliderBackground(value) {
+            const percentage = value;
+            progressBar.style.background = `linear-gradient(to right, #60a5fa 0%, #a78bfa ${percentage}%, rgba(255, 255, 255, 0.1) ${percentage}%, rgba(255, 255, 255, 0.1) 100%)`;
+        }
+
+        audioElement.addEventListener('timeupdate', () => {
+            if (!audioElement.duration) return;
+            const progress = (audioElement.currentTime / audioElement.duration) * 100;
+            progressBar.value = progress;
+            updateSliderBackground(progress);
+            currentTimeEl.textContent = formatTime(audioElement.currentTime);
+        });
+
+        audioElement.addEventListener('loadedmetadata', () => {
+            totalDurationEl.textContent = formatTime(audioElement.duration);
+        });
+
+        audioElement.addEventListener('ended', playNext);
+
+        progressBar.addEventListener('input', (e) => {
+            if (!audioElement.duration) return;
+            const val = e.target.value; updateSliderBackground(val);
+            const seekTime = (val / 100) * audioElement.duration;
+            audioElement.currentTime = seekTime;
+        });
+
+        function onDocumentMouseMove(event) {
+            mousePosition.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mousePosition.y = (event.clientY / window.innerHeight) * 2 - 1;
+        }
+        
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            let bassIntensity = 0; let midIntensity = 0; let highIntensity = 0;
+            const time = Date.now() * 0.001; 
+            
+            // Lecture des données audio UNIQUEMENT si le setup a réussi
+            if (isAudioSetup && isPlaying && analyser) {
+                analyser.getByteFrequencyData(dataArray);
+                let bTotal = 0; for(let i=0; i<20; i++) bTotal += dataArray[i]; bassIntensity = (bTotal / 20) / 255; 
+                let mTotal = 0; for(let i=20; i<100; i++) mTotal += dataArray[i]; midIntensity = (mTotal / 80) / 255;
+                let hTotal = 0; for(let i=100; i<300; i++) hTotal += dataArray[i]; highIntensity = (hTotal / 200) / 255;
+                if (bassIntensity > beatThreshold && (time - lastBeatTime) > 0.4) { lastBeatTime = time; beatCounter++; }
+            }
+
+            if (bassIntensity > smoothedBass) smoothedBass += (bassIntensity - smoothedBass) * 0.05;
+            else smoothedBass += (bassIntensity - smoothedBass) * 0.02;
+            smoothedMid += (midIntensity - smoothedMid) * 0.05;
+            smoothedHigh += (highIntensity - smoothedHigh) * 0.05;
+
+            let cleanBass = Math.max(0, bassIntensity - 0.4) * 2.0; cleanBass = Math.min(cleanBass, 1.0); 
+            if (cleanBass > pulseBass) pulseBass = cleanBass; else pulseBass += (0 - pulseBass) * 0.2; 
+            let cleanMid = Math.max(0, midIntensity - 0.3) * 2.0; cleanMid = Math.min(cleanMid, 1.0);
+            if (cleanMid > pulseMid) pulseMid = cleanMid; else pulseMid += (0 - pulseMid) * 0.15;
+            let cleanHigh = Math.max(0, highIntensity - 0.2) * 2.5; cleanHigh = Math.min(cleanHigh, 1.0);
+            if (cleanHigh > pulseHigh) pulseHigh = cleanHigh; else pulseHigh += (0 - pulseHigh) * 0.25;
+
+            if (scene.fog) {
+                const flashR = 1 + (pulseBass * 15); const flashG = 1 + (pulseBass * 8); const flashB = 3 + (pulseBass * 30);
+                scene.fog.color.setRGB(flashR/255, flashG/255, flashB/255);
+            }
+
+            let musicIntensity = (smoothedBass * 0.5) + (smoothedMid * 0.4) + (smoothedHigh * 0.4);
+            let targetSpeed = baseSpeed + Math.pow(musicIntensity, 3.0) * 80.0; 
+            if (targetSpeed > currentSpeed) currentSpeed += (targetSpeed - currentSpeed) * 0.05;
+            else currentSpeed += (targetSpeed - currentSpeed) * 0.01;
+
+            const turnSpeedX = (-mousePosition.x * 50) + autoDrift.x; const turnSpeedY = (-mousePosition.y * 50) + autoDrift.y;
+
+            if (particles) {
+                const targetRoll = (-mousePosition.x * 0.8) + autoRoll;
+                particles.rotation.z += (targetRoll - particles.rotation.z) * 0.02; 
+                particles.material.uniforms.uBass.value = pulseBass;
+                particles.material.uniforms.uMid.value = pulseMid;
+                particles.material.uniforms.uHigh.value = pulseHigh;
+            }
+
+            const targetFOV = 70 + (smoothedBass * 20);
+            camera.fov += (targetFOV - camera.fov) * 0.02;
+            camera.updateProjectionMatrix();
+
+            const positions = particles.geometry.attributes.position.array;
+            const maxZ = 2000; const spawnZ = -SPACE_DEPTH + 1000; const halfWidth = SPACE_WIDTH / 2;
+            const currentTurnX = turnSpeedX * (1 + smoothedBass * 2); const currentTurnY = turnSpeedY * (1 + smoothedBass * 2);
+            
+            for (let i = 0; i < PARTICLE_COUNT; i++) {
+                let i3 = i * 3;
+                positions[i3 + 2] += currentSpeed;
+                positions[i3] += currentTurnX; positions[i3 + 1] += currentTurnY; 
+                if (positions[i3] > halfWidth) positions[i3] -= SPACE_WIDTH; if (positions[i3] < -halfWidth) positions[i3] += SPACE_WIDTH;
+                if (positions[i3+1] > halfWidth) positions[i3+1] -= SPACE_WIDTH; if (positions[i3+1] < -halfWidth) positions[i3+1] += SPACE_WIDTH;
+                if (positions[i3 + 2] > maxZ) {
+                    positions[i3 + 2] = spawnZ - Math.random() * 500; 
+                    positions[i3] = (Math.random() - 0.5) * SPACE_WIDTH;
+                    positions[i3+1] = (Math.random() - 0.5) * SPACE_WIDTH;
+                }
+            }
+            particles.geometry.attributes.position.needsUpdate = true;
+            renderer.render(scene, camera);
+        }
+
+        initThree();
+    </script>
+</body>
+</html>

@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Coloriage Collaboratif</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-color: #FF6B6B;
+            --bg-color: #F3F4F6;
+            --panel-height: 140px;
+            --header-height: 60px;
+        }
+        * { box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; }
+        body {
+            margin: 0; padding: 0; height: 100vh; width: 100vw;
+            display: flex; flex-direction: column;
+            background-color: var(--bg-color);
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            overflow: hidden;
+        }
+        #start-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: white; z-index: 1000;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center; gap: 20px;
+            transition: transform 0.3s ease-in-out;
+        }
+        .app-logo { font-size: 3rem; color: var(--primary-color); margin-bottom: 20px; }
+        .btn-start {
+            padding: 15px 30px; font-size: 1.1rem; border: none;
+            border-radius: 50px; background: var(--primary-color); color: white;
+            cursor: pointer; width: 220px;
+            box-shadow: 0 4px 15px rgba(255, 107, 107, 0.3);
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+        }
+        .btn-start:active { transform: scale(0.95); }
+        .btn-secondary { background: #ddd; color: #333; box-shadow: none; }
+        input.room-input { padding: 15px; border-radius: 15px; border: 2px solid #ddd; font-size: 1rem; text-align: center; width: 220px; }
+        header {
+            height: var(--header-height); background: white;
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); z-index: 10;
+        }
+        .header-right { display: flex; gap: 5px; }
+        .header-btn { font-size: 1.2rem; color: #666; background: none; border: none; cursor: pointer; padding: 10px; width: 40px; }
+        .room-badge {
+            background: #eef; color: #55a; padding: 5px 12px; border-radius: 20px; font-weight: bold; font-size: 0.9rem; display: flex; align-items: center; gap: 5px;
+        }
+        #canvas-wrapper {
+            flex: 1; position: relative; overflow: hidden;
+            display: flex; justify-content: center; align-items: center;
+            background-image: radial-gradient(#ddd 1px, transparent 1px);
+            background-size: 20px 20px;
+            touch-action: none;
+        }
+        #canvas-container {
+            position: relative;
+            transform-origin: center center;
+            will-change: transform;
+        }
+        canvas {
+            background: white;
+            box-shadow: 0 5px 25px rgba(0,0,0,0.1);
+            display: block;
+            image-rendering: high-quality;
+            image-rendering: -webkit-optimize-contrast;
+        }
+        #svg-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            background: white;
+            box-shadow: 0 5px 25px rgba(0,0,0,0.1);
+        }
+        #svg-container svg {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        #crop-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            cursor: move;
+        }
+        #crop-overlay.active { display: block; }
+        #crop-box {
+            position: absolute;
+            border: 2px solid white;
+            box-shadow: 0 0 0 9999px rgba(0,0,0,0.5);
+            cursor: move;
+        }
+        .crop-handle {
+            position: absolute;
+            width: 20px; height: 20px;
+            background: white;
+            border: 2px solid var(--primary-color);
+            border-radius: 50%;
+        }
+        .crop-handle.nw { top: -10px; left: -10px; cursor: nw-resize; }
+        .crop-handle.ne { top: -10px; right: -10px; cursor: ne-resize; }
+        .crop-handle.sw { bottom: -10px; left: -10px; cursor: sw-resize; }
+        .crop-handle.se { bottom: -10px; right: -10px; cursor: se-resize; }
+        #crop-actions {
+            position: absolute; bottom: 20px; left: 50%;
+            transform: translateX(-50%);
+            display: none; gap: 10px; z-index: 100;
+        }
+        #crop-actions.active { display: flex; }
+        .crop-btn {
+            padding: 12px 24px; border: none; border-radius: 25px;
+            font-size: 1rem; font-weight: bold; cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+        .crop-btn.confirm { background: var(--primary-color); color: white; }
+        .crop-btn.cancel { background: white; color: #333; }
+        #zoom-indicator {
+            position: absolute; bottom: 15px; right: 15px;
+            background: rgba(0,0,0,0.6); color: white;
+            padding: 8px 14px; border-radius: 20px; font-size: 0.85rem;
+            opacity: 0; transition: opacity 0.3s; pointer-events: none;
+        }
+        #zoom-indicator.visible { opacity: 1; }
+        #bottom-panel {
+            height: var(--panel-height); background: white;
+            border-top-left-radius: 20px; border-top-right-radius: 20px;
+            box-shadow: 0 -5px 20px rgba(0,0,0,0.05);
+            display: flex; flex-direction: column; z-index: 10;
+        }
+        .tools-row {
+            display: flex; justify-content: center; gap: 20px;
+            padding: 15px 0 5px 0; border-bottom: 1px solid #f0f0f0;
+        }
+        .tool-btn {
+            width: 45px; height: 45px; border-radius: 12px; border: none;
+            background: #f5f5f5; color: #666; font-size: 1.2rem;
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+        }
+        .tool-btn.active { background: var(--primary-color); color: white; transform: translateY(-2px); }
+        .colors-row {
+            flex: 1; display: flex; align-items: center;
+            overflow-x: auto; padding: 0 20px; gap: 15px; scrollbar-width: none;
+        }
+        .colors-row::-webkit-scrollbar { display: none; }
+        .color-swatch {
+            width: 45px; height: 45px; border-radius: 50%; flex-shrink: 0;
+            border: 3px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            cursor: pointer; transition: transform 0.2s;
+        }
+        .color-swatch.selected { transform: scale(1.15); border-color: #333; }
+        #file-input { display: none; }
+    </style>
+</head>
+<body>
+    <div id="start-screen">
+        <div class="app-logo"><i class="fa-solid fa-palette"></i></div>
+        <h2>Coloriage Together</h2>
+        <button class="btn-start" onclick="startSolo()"><i class="fa-solid fa-play"></i> Commencer</button>
+        <div style="width: 220px; height: 1px; background: #eee; margin: 10px 0;"></div>
+        <input type="text" class="room-input" placeholder="Code partie..." id="room-code-input">
+        <button class="btn-start btn-secondary" onclick="joinRoom()">Rejoindre</button>
+    </div>
+    <div id="app-interface" style="display:none; height: 100%; flex-direction: column;">
+        <header>
+            <button class="header-btn" onclick="goHome()"><i class="fa-solid fa-chevron-left"></i></button>
+            <div class="room-badge"><i class="fa-solid fa-users"></i> <span id="display-room-code">SOLO</span></div>
+            <div class="header-right">
+                <button class="header-btn" onclick="triggerImport()"><i class="fa-regular fa-image"></i></button>
+                <button class="header-btn" onclick="startCrop()"><i class="fa-solid fa-crop"></i></button>
+                <button class="header-btn" onclick="undo()"><i class="fa-solid fa-rotate-left"></i></button>
+                <button class="header-btn" onclick="redo()"><i class="fa-solid fa-rotate-right"></i></button>
+                <button class="header-btn" onclick="resetZoom()"><i class="fa-solid fa-compress"></i></button>
+            </div>
+        </header>
+        <input type="file" id="file-input" accept="image/*,.svg">
+        <div id="canvas-wrapper">
+            <div id="canvas-container">
+                <canvas id="drawing-canvas"></canvas>
+                <div id="svg-container"></div>
+            </div>
+            <div id="crop-overlay">
+                <div id="crop-box">
+                    <div class="crop-handle nw"></div>
+                    <div class="crop-handle ne"></div>
+                    <div class="crop-handle sw"></div>
+                    <div class="crop-handle se"></div>
+                </div>
+            </div>
+            <div id="crop-actions">
+                <button class="crop-btn cancel" onclick="cancelCrop()">Annuler</button>
+                <button class="crop-btn confirm" onclick="applyCrop()">Recadrer</button>
+            </div>
+            <div id="zoom-indicator">100%</div>
+        </div>
+        <div id="bottom-panel">
+            <div class="tools-row">
+                <button class="tool-btn active" id="tool-fill" onclick="selectTool('fill')"><i class="fa-solid fa-fill-drip"></i></button>
+                <button class="tool-btn" id="tool-brush" onclick="selectTool('brush')"><i class="fa-solid fa-paintbrush"></i></button>
+                <button class="tool-btn" id="tool-eraser" onclick="selectTool('eraser')"><i class="fa-solid fa-eraser"></i></button>
+            </div>
+            <div class="colors-row" id="color-palette">
+                <div class="color-swatch selected" style="background: #FF6B6B;" onclick="selectColor(this)"></div>
+                <div class="color-swatch" style="background: #FF9F43;" onclick="selectColor(this)"></div>
+                <div class="color-swatch" style="background: #FECA57;" onclick="selectColor(this)"></div>
+                <div class="color-swatch" style="background: #1DD1A1;" onclick="selectColor(this)"></div>
+                <div class="color-swatch" style="background: #48DBFB;" onclick="selectColor(this)"></div>
+                <div class="color-swatch" style="background: #54A0FF;" onclick="selectColor(this)"></div>
+                <div class="color-swatch" style="background: #5f27cd;" onclick="selectColor(this)"></div>
+                <div class="color-swatch" style="background: #222f3e;" onclick="selectColor(this)"></div>
+                <div class="color-swatch" style="background: #ffffff;" onclick="selectColor(this)"></div>
+            </div>
+        </div>
+    </div>
+    <script>
+        const canvas = document.getElementById('drawing-canvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        const wrapper = document.getElementById('canvas-wrapper');
+        const container = document.getElementById('canvas-container');
+        const svgContainer = document.getElementById('svg-container');
+        const fileInput = document.getElementById('file-input');
+        const zoomIndicator = document.getElementById('zoom-indicator');
+        const cropOverlay = document.getElementById('crop-overlay');
+        const cropBox = document.getElementById('crop-box');
+        const cropActions = document.getElementById('crop-actions');
+
+        let currentTool = 'fill', currentColor = '#FF6B6B', brushSize = 15, isDrawing = false;
+        let historyStack = [], currentStep = -1;
+        const MAX_HISTORY = 30;
+        let protectedLines = null; // Pour stocker les lignes à protéger
+        let isSVGMode = false; // Mode SVG natif
+        let originalSVG = null; // SVG original
+
+        // Zoom & Pan
+        let scale = 1, translateX = 0, translateY = 0;
+        const MIN_SCALE = 0.5, MAX_SCALE = 5;
+        let isPanning = false, lastPanX = 0, lastPanY = 0;
+        let initialPinchDist = 0, initialScale = 1;
+        let zoomTimeout;
+
+        // Crop
+        let isCropping = false;
+        let cropData = { x: 0, y: 0, width: 0, height: 0 };
+        let isDraggingCrop = false, isResizingCrop = false;
+        let cropDragStart = { x: 0, y: 0 };
+        let resizeHandle = null;
+
+        function updateTransform() {
+            container.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
+        }
+
+        function showZoom() {
+            zoomIndicator.textContent = Math.round(scale * 100) + '%';
+            zoomIndicator.classList.add('visible');
+            clearTimeout(zoomTimeout);
+            zoomTimeout = setTimeout(() => zoomIndicator.classList.remove('visible'), 1000);
+        }
+
+        function fitToScreen() {
+            const wRect = wrapper.getBoundingClientRect();
+            if (wRect.width === 0 || wRect.height === 0 || canvas.width === 0) return;
+            const scaleX = wRect.width / canvas.width;
+            const scaleY = wRect.height / canvas.height;
+            scale = Math.min(scaleX, scaleY) * 0.9;
+            translateX = 0;
+            translateY = 0;
+            updateTransform();
+        }
+
+        function resetZoom() {
+            fitToScreen();
+            showZoom();
+        }
+
+        function zoomAt(clientX, clientY, delta) {
+            const oldScale = scale;
+            const newScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale * delta));
+            if (newScale === oldScale) return;
+            
+            const rect = wrapper.getBoundingClientRect();
+            const mouseX = clientX - rect.left - rect.width / 2;
+            const mouseY = clientY - rect.top - rect.height / 2;
+            
+            const pointX = (mouseX - translateX) / oldScale;
+            const pointY = (mouseY - translateY) / oldScale;
+            
+            scale = newScale;
+            translateX = mouseX - pointX * scale;
+            translateY = mouseY - pointY * scale;
+            
+            updateTransform();
+            showZoom();
+        }
+
+        // Mouse wheel zoom
+        wrapper.addEventListener('wheel', e => {
+            e.preventDefault();
+            const delta = e.deltaY < 0 ? 1.15 : 0.87;
+            zoomAt(e.clientX, e.clientY, delta);
+        }, { passive: false });
+
+        // Touch handling
+        let touches = [];
+        function getTouchDist(t) {
+            const dx = t[0].clientX - t[1].clientX, dy = t[0].clientY - t[1].clientY;
+            return Math.hypot(dx, dy);
+        }
+        function getTouchCenter(t) {
+            return { x: (t[0].clientX + t[1].clientX) / 2, y: (t[0].clientY + t[1].clientY) / 2 };
+        }
+
+        wrapper.addEventListener('touchstart', e => {
+            if (isCropping) return;
+            touches = [...e.touches];
+            if (touches.length === 2) {
+                initialPinchDist = getTouchDist(touches);
+                initialScale = scale;
+                isPanning = true;
+                const c = getTouchCenter(touches);
+                lastPanX = c.x; lastPanY = c.y;
+            } else if (touches.length === 1) {
+                startDraw(e);
+            }
+        }, { passive: false });
+
+        wrapper.addEventListener('touchmove', e => {
+            touches = [...e.touches];
+            if (touches.length === 2) {
+                e.preventDefault();
+                const dist = getTouchDist(touches);
+                const newScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, initialScale * (dist / initialPinchDist)));
+                const c = getTouchCenter(touches);
+                const rect = wrapper.getBoundingClientRect();
+                const centerX = c.x - rect.left - rect.width / 2;
+                const centerY = c.y - rect.top - rect.height / 2;
+                const pointX = (centerX - translateX) / scale;
+                const pointY = (centerY - translateY) / scale;
+                translateX = centerX - pointX * newScale;
+                translateY = centerY - pointY * newScale;
+                translateX += c.x - lastPanX;
+                translateY += c.y - lastPanY;
+                scale = newScale;
+                lastPanX = c.x; lastPanY = c.y;
+                updateTransform();
+                showZoom();
+            } else if (touches.length === 1 && !isPanning) {
+                moveDraw(e);
+            }
+        }, { passive: false });
+
+        wrapper.addEventListener('touchend', e => {
+            if (e.touches.length < 2) isPanning = false;
+            if (e.touches.length === 0) endDraw();
+            touches = [...e.touches];
+        });
+
+        // Pan with middle mouse or space+drag
+        let spaceDown = false;
+        document.addEventListener('keydown', e => { if (e.code === 'Space') spaceDown = true; });
+        document.addEventListener('keyup', e => { if (e.code === 'Space') spaceDown = false; });
+
+        wrapper.addEventListener('mousedown', e => {
+            if (isCropping) return;
+            if (e.button === 1 || spaceDown) {
+                isPanning = true;
+                lastPanX = e.clientX; lastPanY = e.clientY;
+                e.preventDefault();
+            } else {
+                startDraw(e);
+            }
+        });
+
+        wrapper.addEventListener('mousemove', e => {
+            if (isPanning) {
+                translateX += e.clientX - lastPanX;
+                translateY += e.clientY - lastPanY;
+                lastPanX = e.clientX; lastPanY = e.clientY;
+                updateTransform();
+            } else {
+                moveDraw(e);
+            }
+        });
+
+        wrapper.addEventListener('mouseup', e => {
+            if (isPanning) isPanning = false;
+            else endDraw();
+        });
+        wrapper.addEventListener('mouseleave', () => { isPanning = false; endDraw(); });
+
+        // History
+        function saveState() {
+            currentStep++;
+            if (currentStep < historyStack.length) historyStack.length = currentStep;
+            historyStack.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+            if (historyStack.length > MAX_HISTORY) { historyStack.shift(); currentStep--; }
+        }
+        function undo() { if (currentStep > 0) { currentStep--; ctx.putImageData(historyStack[currentStep], 0, 0); } }
+        function redo() { if (currentStep < historyStack.length - 1) { currentStep++; ctx.putImageData(historyStack[currentStep], 0, 0); } }
+        document.addEventListener('keydown', e => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undo(); }
+            if ((e.ctrlKey || e.metaKey) && e.key === 'y') { e.preventDefault(); redo(); }
+        });
+
+        // Navigation
+        function startSolo() {
+            if (canvas.width === 0 || canvas.width === 300) initBlankCanvas();
+            switchToApp();
+        }
+        function switchToApp() {
+            document.getElementById('start-screen').style.transform = 'translateY(-100%)';
+            setTimeout(() => {
+                document.getElementById('start-screen').style.display = 'none';
+                document.getElementById('app-interface').style.display = 'flex';
+                setTimeout(() => {
+                    fitToScreen();
+                }, 100);
+            }, 300);
+        }
+        function goHome() {
+            document.getElementById('start-screen').style.display = 'flex';
+            requestAnimationFrame(() => {
+                document.getElementById('start-screen').style.transform = 'translateY(0)';
+                document.getElementById('app-interface').style.display = 'none';
+            });
+        }
+        function joinRoom() { alert("Bientôt !"); }
+        function selectTool(t) {
+            currentTool = t;
+            document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('tool-' + t).classList.add('active');
+        }
+        function selectColor(el) {
+            currentColor = el.style.background;
+            document.querySelectorAll('.color-swatch').forEach(e => e.classList.remove('selected'));
+            el.classList.add('selected');
+        }
+
+        // Canvas init
+        function initBlankCanvas() {
+            isSVGMode = false;
+            svgContainer.style.display = 'none';
+            svgContainer.innerHTML = '';
+            canvas.width = 1500; canvas.height = 1500;
+            ctx.fillStyle = "white"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            historyStack = []; currentStep = -1; saveState();
+            protectedLines = null; // Pas de lignes à protéger sur canvas vierge
+            setTimeout(fitToScreen, 50);
+        }
+        function triggerImport() { fileInput.click(); }
+        fileInput.addEventListener('change', function(e) {
+            if (e.target.files && e.target.files[0]) {
+                const reader = new FileReader();
+                reader.onload = ev => {
+                    const img = new Image();
+                    img.onload = () => setupCanvasWithImage(img);
+                    img.src = ev.target.result;
+                };
+                reader.readAsDataURL(e.target.files[0]);
+            }
+            this.value = null;
+        });
+        function setupCanvasWithImage(img) {
+            const MAX = 2500;
+            let w = img.width, h = img.height;
+            if (w > MAX || h > MAX) { const r = Math.min(MAX/w, MAX/h); w *= r; h *= r; }
+            canvas.width = w; canvas.height = h;
+            ctx.drawImage(img, 0, 0, w, h);
+            historyStack = []; currentStep = -1; saveState();
+            scale = 1; centerCanvas();
+        }
+
+        // Drawing
+        function getPos(e) {
+            if (isCropping) return { x: 0, y: 0 };
+            const rect = canvas.getBoundingClientRect();
+            const cx = (e.touches && e.touches[0]) ? e.touches[0].clientX : e.clientX;
+            const cy = (e.touches && e.touches[0]) ? e.touches[0].clientY : e.clientY;
+            return {
+                x: Math.floor((cx - rect.left) * (canvas.width / rect.width)),
+                y: Math.floor((cy - rect.top) * (canvas.height / rect.height))
+            };
+        }
+        function startDraw(e) {
+            if (isPanning || isCropping) return;
+            isDrawing = true;
+            const pos = getPos(e);
+            if (currentTool === 'fill') {
+                floodFill(pos.x, pos.y, currentColor);
+                isDrawing = false;
+            } else {
+                ctx.beginPath();
+                ctx.moveTo(pos.x, pos.y);
+                ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+                ctx.lineWidth = brushSize;
+                ctx.strokeStyle = currentTool === 'eraser' ? "white" : currentColor;
+            }
+        }
+        function moveDraw(e) {
+            if (!isDrawing || currentTool === 'fill' || isPanning || isCropping) return;
+            e.preventDefault();
+            const pos = getPos(e);
+            ctx.lineTo(pos.x, pos.y);
+            ctx.stroke();
+        }
+        function updateSVGOverlay() {
+            if (isSVGMode && originalSVG) {
+                // Le SVG reste en overlay, synchronisé avec le canvas
+                svgContainer.style.width = canvas.width + 'px';
+                svgContainer.style.height = canvas.height + 'px';
+            }
+        }
+
+        function endDraw() {
+            if (isDrawing && currentTool !== 'fill') {
+                isDrawing = false;
+                ctx.closePath();
+                restoreProtectedLines(); // Restaurer les lignes après dessin
+                updateSVGOverlay();
+                saveState();
+            }
+        }
+
+        // Flood fill
+        function hexToRgb(hex) {
+            const c = document.createElement('canvas').getContext('2d');
+            c.fillStyle = hex;
+            return { r: parseInt(c.fillStyle.slice(1,3),16), g: parseInt(c.fillStyle.slice(3,5),16), b: parseInt(c.fillStyle.slice(5,7),16) };
+        }
+        function colorsMatch(r1,g1,b1,r2,g2,b2,t) { return Math.abs(r1-r2)<=t && Math.abs(g1-g2)<=t && Math.abs(b1-b2)<=t; }
+        function isLinPixel(r, g, b) {
+            if (!protectedLines) return false;
+            const brightness = (r + g + b) / 3;
+            // Considérer comme ligne si très sombre OU si peu saturé et pas trop clair
+            // (pour capturer les traits gris/anti-aliasés)
+            const saturation = Math.max(r, g, b) - Math.min(r, g, b);
+            return brightness < 180 && saturation < 30;
+        }
+
+        function floodFill(sx, sy, newHex) {
+            const imgData = ctx.getImageData(0,0,canvas.width,canvas.height);
+            const data = imgData.data;
+            const w = canvas.width, h = canvas.height;
+            const fill = hexToRgb(newHex);
+            const sp = (sy * w + sx) * 4;
+            const tr = data[sp], tg = data[sp+1], tb = data[sp+2];
+            
+            // Ne pas remplir si on clique sur une ligne
+            if (isLinPixel(tr, tg, tb)) return;
+            if (colorsMatch(tr,tg,tb,fill.r,fill.g,fill.b,10)) return;
+            
+            const stack = [[sx,sy]];
+            const visited = new Uint8Array(w * h);
+            
+            while (stack.length) {
+                const [x,y] = stack.pop();
+                if (x<0||x>=w||y<0||y>=h) continue;
+                
+                const pixelIdx = y * w + x;
+                if (visited[pixelIdx]) continue;
+                visited[pixelIdx] = 1;
+                
+                const p = pixelIdx * 4;
+                const pr = data[p], pg = data[p+1], pb = data[p+2];
+                
+                // Ne pas remplir les lignes (pixels sombres ou gris peu saturés)
+                if (isLinPixel(pr, pg, pb)) continue;
+                
+                // Vérifier si la couleur correspond à la zone de départ
+                if (colorsMatch(pr, pg, pb, tr, tg, tb, 40)) {
+                    data[p]=fill.r; data[p+1]=fill.g; data[p+2]=fill.b; data[p+3]=255;
+                    stack.push([x+1,y],[x-1,y],[x,y+1],[x,y-1]);
+                }
+            }
+            ctx.putImageData(imgData,0,0);
+            updateSVGOverlay();
+            saveState();
+        }
+
+        window.addEventListener('load', () => setTimeout(initBlankCanvas, 100));
+        window.addEventListener('resize', fitToScreen);
+
+        // === CROP FUNCTIONS ===
+        function startCrop() {
+            if (canvas.width === 0) return;
+            isCropping = true;
+            cropOverlay.classList.add('active');
+            cropActions.classList.add('active');
+            
+            const rect = canvas.getBoundingClientRect();
+            const margin = Math.min(rect.width, rect.height) * 0.1;
+            cropData = {
+                x: rect.left + margin,
+                y: rect.top + margin,
+                width: rect.width - margin * 2,
+                height: rect.height - margin * 2
+            };
+            updateCropBox();
+        }
+
+        function updateCropBox() {
+            cropBox.style.left = cropData.x + 'px';
+            cropBox.style.top = cropData.y + 'px';
+            cropBox.style.width = cropData.width + 'px';
+            cropBox.style.height = cropData.height + 'px';
+        }
+
+        function cancelCrop() {
+            isCropping = false;
+            cropOverlay.classList.remove('active');
+            cropActions.classList.remove('active');
+        }
+
+        function applyCrop() {
+            const canvasRect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / canvasRect.width;
+            const scaleY = canvas.height / canvasRect.height;
+            
+            const cropX = Math.max(0, (cropData.x - canvasRect.left) * scaleX);
+            const cropY = Math.max(0, (cropData.y - canvasRect.top) * scaleY);
+            const cropW = Math.min(canvas.width - cropX, cropData.width * scaleX);
+            const cropH = Math.min(canvas.height - cropY, cropData.height * scaleY);
+            
+            const imageData = ctx.getImageData(cropX, cropY, cropW, cropH);
+            canvas.width = cropW;
+            canvas.height = cropH;
+            ctx.putImageData(imageData, 0, 0);
+            
+            // Recadrer aussi les lignes protégées
+            if (protectedLines) {
+                const oldWidth = Math.round(cropX + cropW) > canvas.width ? canvas.width : Math.round(cropX + cropW);
+                const newProtected = new Uint8Array(cropW * cropH);
+                for (let y = 0; y < cropH; y++) {
+                    for (let x = 0; x < cropW; x++) {
+                        const oldIdx = Math.floor((cropY + y) * oldWidth + (cropX + x));
+                        const newIdx = y * cropW + x;
+                        if (oldIdx < protectedLines.length) {
+                            newProtected[newIdx] = protectedLines[oldIdx];
+                        }
+                    }
+                }
+                protectedLines = newProtected;
+            }
+            
+            historyStack = []; currentStep = -1; saveState();
+            cancelCrop();
+            fitToScreen();
+        }
+
+        // Crop drag handlers
+        cropBox.addEventListener('mousedown', e => {
+            if (e.target.classList.contains('crop-handle')) {
+                isResizingCrop = true;
+                resizeHandle = e.target.classList[1];
+            } else {
+                isDraggingCrop = true;
+            }
+            cropDragStart = { x: e.clientX - cropData.x, y: e.clientY - cropData.y };
+            e.stopPropagation();
+        });
+
+        document.addEventListener('mousemove', e => {
+            if (isDraggingCrop) {
+                cropData.x = e.clientX - cropDragStart.x;
+                cropData.y = e.clientY - cropDragStart.y;
+                updateCropBox();
+            } else if (isResizingCrop) {
+                const dx = e.clientX - (cropData.x + cropDragStart.x);
+                const dy = e.clientY - (cropData.y + cropDragStart.y);
+                
+                if (resizeHandle === 'se') {
+                    cropData.width = Math.max(50, cropData.width + dx);
+                    cropData.height = Math.max(50, cropData.height + dy);
+                    cropDragStart.x = e.clientX - cropData.x;
+                    cropDragStart.y = e.clientY - cropData.y;
+                } else if (resizeHandle === 'nw') {
+                    const newW = cropData.width - dx;
+                    const newH = cropData.height - dy;
+                    if (newW > 50) { cropData.x = e.clientX - cropDragStart.x; cropData.width = newW; }
+                    if (newH > 50) { cropData.y = e.clientY - cropDragStart.y; cropData.height = newH; }
+                } else if (resizeHandle === 'ne') {
+                    cropData.width = Math.max(50, cropData.width + dx);
+                    const newH = cropData.height - dy;
+                    if (newH > 50) { cropData.y = e.clientY - cropDragStart.y; cropData.height = newH; }
+                    cropDragStart.x = e.clientX - cropData.x;
+                } else if (resizeHandle === 'sw') {
+                    const newW = cropData.width - dx;
+                    if (newW > 50) { cropData.x = e.clientX - cropDragStart.x; cropData.width = newW; }
+                    cropData.height = Math.max(50, cropData.height + dy);
+                    cropDragStart.y = e.clientY - cropData.y;
+                }
+                updateCropBox();
+            }
+        });
+
+        document.addEventListener('mouseup', () => {
+            isDraggingCrop = false;
+            isResizingCrop = false;
+            resizeHandle = null;
+        });
+    </script>
+</body>
+</html>
