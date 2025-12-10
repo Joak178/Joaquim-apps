@@ -18,14 +18,10 @@
         
         /* --- STYLE VERRE --- */
         .glass-panel {
-            /* Plus transparent avec un dégradé pour un effet liquide et réfléchissant */
             background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.02) 100%);
-            /* Flou d'arrière-plan plus important pour un effet verre plus épais */
             backdrop-filter: blur(25px);
             -webkit-backdrop-filter: blur(25px);
-            /* Bordure légèrement plus marquée */
             border: 1px solid rgba(255, 255, 255, 0.15);
-            /* Ombre portée plus profonde et ajout d'un reflet interne (inset) en haut */
             box-shadow: 
                 0 8px 32px 0 rgba(0, 0, 0, 0.4),
                 inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
@@ -84,19 +80,16 @@
         <!-- BAS : Contrôles & Playlist -->
         <div class="glass-panel p-6 rounded-2xl pointer-events-auto flex flex-col items-center gap-5 fade-in w-full max-w-md mb-8 border-t border-white/20 relative">
             
-            <!-- Zone Contrôles (Relative pour permettre l'absolute du bouton import) -->
+            <!-- Zone Contrôles -->
             <div class="relative flex items-center justify-center w-full mt-2">
                 
-                <!-- Groupe Central : Précédent / Play / Suivant -->
                 <div class="flex items-center justify-center gap-4">
-                    <!-- Précédent -->
                     <button id="prev-btn" class="text-gray-400 hover:text-white transition transform active:scale-90 p-2">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
                         </svg>
                     </button>
 
-                    <!-- Play/Pause (Taille fixe w-40) -->
                     <button id="play-btn" disabled class="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold py-3 px-0 w-40 rounded-xl transition transform hover:scale-105 active:scale-95 shadow-lg flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed">
                         <svg id="play-icon" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
@@ -108,7 +101,6 @@
                         <span id="play-text" class="text-sm tracking-widest uppercase">PLAY</span>
                     </button>
 
-                    <!-- Suivant -->
                     <button id="next-btn" class="text-gray-400 hover:text-white transition transform active:scale-90 p-2">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
@@ -116,7 +108,6 @@
                     </button>
                 </div>
 
-                <!-- BOUTON IMPORT (Positionné Absolument à Droite) -->
                 <label class="absolute right-0 cursor-pointer text-gray-400 hover:text-white transition transform hover:scale-110 active:scale-95 p-2" title="Importer des fichiers audio">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
@@ -145,7 +136,7 @@
 
     <script>
         // --- CONFIGURATION ---
-        const PARTICLE_COUNT = 2500; 
+        const PARTICLE_COUNT = 3000;
         const SPACE_WIDTH = 10000;   
         const SPACE_DEPTH = 5000;
         
@@ -159,8 +150,6 @@
         let isAudioSetup = false;
         let isPlaying = false;
         
-        // Playlist Logic
-        // Playlist vide par défaut
         let playlist = [];
         let currentTrackIndex = 0;
 
@@ -174,7 +163,7 @@
         let autoRoll = 0;               
         
         // VITESSE & INERTIE
-        let baseSpeed = 0.1; 
+        let baseSpeed = 0.05; 
         let currentSpeed = baseSpeed;
         
         // Valeurs Audio
@@ -222,15 +211,17 @@
                 vRandom = aRandom;
                 vSpriteIndex = aSpriteIndex;
                 vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+                
                 float intensity = 0.0;
+                // Sensibilité ajustée : on booste un peu les mids et highs dans le shader
                 if(aFreqIndex < 0.5) intensity = uBass;
-                else if(aFreqIndex < 1.5) intensity = uMid;
-                else intensity = uHigh;
+                else if(aFreqIndex < 1.5) intensity = uMid * 1.2;
+                else intensity = uHigh * 1.4;
+
                 float personalMultiplier = 0.8 + (aRandom * 0.4); 
                 
-                // Modification : Réduction du facteur "explosif" (150.0 au lieu de 600.0)
-                // On garde pow(..., 3.0) pour que la réaction soit très ciblée sur les pics forts (percussions)
-                float expansion = pow(intensity, 3.0) * 150.0 * personalMultiplier; 
+                // Expansion douce et ciblée, non explosive
+                float expansion = pow(intensity, 2.0) * 120.0 * personalMultiplier; 
                 
                 gl_PointSize = (uBaseSize + expansion) * (300.0 / -mvPosition.z);
                 gl_Position = projectionMatrix * mvPosition;
@@ -253,22 +244,24 @@
                 if(vFreqIndex < 0.5) intensity = uBass;
                 else if(vFreqIndex < 1.5) intensity = uMid;
                 else intensity = uHigh;
+                
                 vec2 center = vec2(0.5, 0.5);
                 vec2 centered = uv - center;
                 float reaction = intensity * (2.5 + vRandom);
                 float internalExpansion = 1.0 + reaction; 
                 centered /= internalExpansion;
                 uv = centered + center;
+                
                 float index = floor(vSpriteIndex);
                 float col = mod(index, 4.0);
                 float row = floor(index / 4.0);
                 uv = uv / 4.0;
                 uv.x = uv.x + (col * 0.25);
                 uv.y = uv.y + ((3.0 - row) * 0.25); 
+                
                 vec4 texColor = texture2D(pointTexture, uv);
                 
-                // Modification : Retour à une luminosité stable et douce
-                // On enlève l'effet de clignotement drastique
+                // Luminosité stable
                 float brightness = 0.8 + (intensity * 0.3);
                 
                 gl_FragColor = vec4(color * vColor * brightness, 1.0) * texColor;
@@ -294,8 +287,6 @@
 
             window.addEventListener('resize', onWindowResize, false);
             document.addEventListener('mousemove', onDocumentMouseMove, false);
-            
-            // Touche F pour fullscreen/toggle UI
             document.addEventListener('keydown', function(event) {
                 if (event.key === 'f' || event.key === 'F') {
                     const ui = document.getElementById('ui-container');
@@ -350,28 +341,39 @@
             geometry = new THREE.BufferGeometry();
             const positions = []; const colors = []; const freqIndices = []; const randoms = []; const spriteIndices = []; const rOffsets = []; const colorObj = new THREE.Color();
             const maxZ = 2000; const spawnZ = -SPACE_DEPTH + 1000; const depthRange = maxZ - spawnZ;   
+            
             for (let i = 0; i < PARTICLE_COUNT; i++) {
                 const x = (Math.random() - 0.5) * SPACE_WIDTH; const y = (Math.random() - 0.5) * SPACE_WIDTH; const z = maxZ - Math.random() * depthRange; 
                 positions.push(x, y, z); rOffsets.push(Math.random() - 0.5);
+                
+                // Répartition modifiée pour favoriser les instruments secondaires (Mids/Highs)
                 const r = Math.random();
-                let fIndex = 0; if (r > 0.5) fIndex = 1; if (r > 0.8) fIndex = 2; 
+                let fIndex = 0; 
+                if (r > 0.3) fIndex = 1; // 30% Basses (0.0 - 0.3)
+                if (r > 0.7) fIndex = 2; // 40% Mids (0.3 - 0.7), 30% Highs (0.7 - 1.0)
+                
                 freqIndices.push(fIndex); randoms.push(Math.random()); spriteIndices.push(Math.floor(Math.random() * 16));
-                let hue = 0.6; if(fIndex === 0) hue = 0.6 + (Math.random() * 0.1); 
-                if(fIndex === 1) hue = 0.75 + (Math.random() * 0.1); if(fIndex === 2) hue = 0.5 + (Math.random() * 0.1);  
+                
+                let hue = 0.6; 
+                if(fIndex === 0) hue = 0.6 + (Math.random() * 0.1); 
+                if(fIndex === 1) hue = 0.75 + (Math.random() * 0.1); 
+                if(fIndex === 2) hue = 0.5 + (Math.random() * 0.1);  
+                
                 const saturation = 0.6 + (Math.random() * 0.4); const lightness = 0.4 + (Math.random() * 0.3);
                 colorObj.setHSL(hue, saturation, lightness); colors.push(colorObj.r, colorObj.g, colorObj.b);
             }
+            
             geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
             geometry.setAttribute('customColor', new THREE.Float32BufferAttribute(colors, 3));
             geometry.setAttribute('aFreqIndex', new THREE.Float32BufferAttribute(freqIndices, 1));
             geometry.setAttribute('aRandom', new THREE.Float32BufferAttribute(randoms, 1));
             geometry.setAttribute('aSpriteIndex', new THREE.Float32BufferAttribute(spriteIndices, 1));
             originalPositions = Float32Array.from(positions); randomOffsets = Float32Array.from(rOffsets); 
+            
             const material = new THREE.ShaderMaterial({
                 uniforms: {
                     color: { value: new THREE.Color(0xffffff) }, pointTexture: { value: getSpriteAtlas() },
                     uBass: { value: 0.0 }, uMid: { value: 0.0 }, uHigh: { value: 0.0 }, 
-                    // Taille de base réduite conservée (40.0)
                     uBaseSize: { value: 40.0 } 
                 },
                 vertexShader: vertexShader, fragmentShader: fragmentShader,
@@ -391,16 +393,12 @@
                 analyser.fftSize = 1024; 
                 const bufferLength = analyser.frequencyBinCount;
                 dataArray = new Uint8Array(bufferLength);
-                
-                // TENTATIVE DE CONNEXION AUDIO
                 source = audioContext.createMediaElementSource(audioElement);
                 source.connect(analyser);
                 analyser.connect(audioContext.destination);
                 isAudioSetup = true;
             } catch (e) {
-                console.warn("L'AudioContext a échoué (CORS ou fichier local). La musique jouera sans visualiseur.", e);
-                // On laisse couler l'erreur pour que la musique puisse quand même être jouée par le navigateur
-                // sans passer par le visualiseur.
+                console.warn("Erreur AudioContext:", e);
                 isAudioSetup = false; 
             }
         }
@@ -410,11 +408,10 @@
             currentTrackIndex = index;
             const track = playlist[index];
             
-            // Gestion d'erreurs chargement UI
             audioElement.onerror = function() {
                 console.error("Erreur de chargement du fichier audio : " + track.url);
                 trackTitleEl.textContent = "Erreur : " + track.title;
-                trackInfoEl.textContent = "Fichier inaccessible. Importez-le manuellement.";
+                trackInfoEl.textContent = "Fichier inaccessible.";
             };
 
             audioElement.src = track.url;
@@ -434,7 +431,6 @@
                 isPlaying = false;
             }
 
-            // On essaie de configurer le contexte audio si ce n'est pas fait
             if (!isAudioSetup && autoPlay) setupAudioContext();
         }
 
@@ -453,7 +449,6 @@
         }
 
         function togglePlay(forcePlay = false) {
-            // Tenter de démarrer le contexte audio (nécessaire pour le visualiseur)
             if (!isAudioSetup) setupAudioContext();
             
             if (audioContext && audioContext.state === 'suspended') {
@@ -461,14 +456,14 @@
             }
             
             if (forcePlay === true) {
-                audioElement.play().catch(e => console.log("Lecture auto bloquée par le navigateur:", e));
+                audioElement.play().catch(e => console.log("Lecture auto bloquée", e));
                 isPlaying = true;
             } else {
                 if (isPlaying) { 
                     audioElement.pause(); 
                     isPlaying = false; 
                 } else { 
-                    audioElement.play().catch(e => console.log("Lecture bloquée:", e)); 
+                    audioElement.play().catch(e => console.log("Lecture bloquée", e)); 
                     isPlaying = true; 
                 }
             }
@@ -549,7 +544,6 @@
             let bassIntensity = 0; let midIntensity = 0; let highIntensity = 0;
             const time = Date.now() * 0.001; 
             
-            // Lecture des données audio UNIQUEMENT si le setup a réussi
             if (isAudioSetup && isPlaying && analyser) {
                 analyser.getByteFrequencyData(dataArray);
                 let bTotal = 0; for(let i=0; i<20; i++) bTotal += dataArray[i]; bassIntensity = (bTotal / 20) / 255; 
@@ -558,10 +552,11 @@
                 if (bassIntensity > beatThreshold && (time - lastBeatTime) > 0.4) { lastBeatTime = time; beatCounter++; }
             }
 
-            if (bassIntensity > smoothedBass) smoothedBass += (bassIntensity - smoothedBass) * 0.05;
-            else smoothedBass += (bassIntensity - smoothedBass) * 0.02;
-            smoothedMid += (midIntensity - smoothedMid) * 0.05;
-            smoothedHigh += (highIntensity - smoothedHigh) * 0.05;
+            // INERTIE REDUITE : Les valeurs tendent vers la cible plus vite (facteur 0.15 au lieu de 0.03)
+            if (bassIntensity > smoothedBass) smoothedBass += (bassIntensity - smoothedBass) * 0.15;
+            else smoothedBass += (bassIntensity - smoothedBass) * 0.05;
+            smoothedMid += (midIntensity - smoothedMid) * 0.15;
+            smoothedHigh += (highIntensity - smoothedHigh) * 0.15;
 
             let cleanBass = Math.max(0, bassIntensity - 0.4) * 2.0; cleanBass = Math.min(cleanBass, 1.0); 
             if (cleanBass > pulseBass) pulseBass = cleanBass; else pulseBass += (0 - pulseBass) * 0.2; 
@@ -576,9 +571,10 @@
             }
 
             let musicIntensity = (smoothedBass * 0.5) + (smoothedMid * 0.4) + (smoothedHigh * 0.4);
-            let targetSpeed = baseSpeed + Math.pow(musicIntensity, 3.0) * 80.0; 
-            if (targetSpeed > currentSpeed) currentSpeed += (targetSpeed - currentSpeed) * 0.05;
-            else currentSpeed += (targetSpeed - currentSpeed) * 0.01;
+            // Réduction de l'inertie de la vitesse aussi (0.15 au lieu de 0.05)
+            let targetSpeed = baseSpeed + Math.pow(musicIntensity, 3.0) * 40.0; 
+            if (targetSpeed > currentSpeed) currentSpeed += (targetSpeed - currentSpeed) * 0.15;
+            else currentSpeed += (targetSpeed - currentSpeed) * 0.05;
 
             const turnSpeedX = (-mousePosition.x * 50) + autoDrift.x; const turnSpeedY = (-mousePosition.y * 50) + autoDrift.y;
 
@@ -591,7 +587,8 @@
             }
 
             const targetFOV = 70 + (smoothedBass * 20);
-            camera.fov += (targetFOV - camera.fov) * 0.02;
+            // Réduction de l'inertie du FOV (0.1 au lieu de 0.02)
+            camera.fov += (targetFOV - camera.fov) * 0.1;
             camera.updateProjectionMatrix();
 
             const positions = particles.geometry.attributes.position.array;
