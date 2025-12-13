@@ -166,6 +166,9 @@
         let baseSpeed = 0.05; 
         let currentSpeed = baseSpeed;
         
+        // VARIABLE AJOUTÉE POUR LE MAINTIEN D'INTENSITÉ (Anti-oscillation)
+        let sustainedIntensity = 0;
+        
         // Valeurs Audio
         let smoothedBass = 0; 
         let smoothedMid = 0; 
@@ -570,11 +573,27 @@
                 scene.fog.color.setRGB(flashR/255, flashG/255, flashB/255);
             }
 
-            let musicIntensity = (smoothedBass * 0.5) + (smoothedMid * 0.4) + (smoothedHigh * 0.4);
-            // Réduction de l'inertie de la vitesse aussi (0.15 au lieu de 0.05)
-            let targetSpeed = baseSpeed + Math.pow(musicIntensity, 3.0) * 40.0; 
-            if (targetSpeed > currentSpeed) currentSpeed += (targetSpeed - currentSpeed) * 0.15;
-            else currentSpeed += (targetSpeed - currentSpeed) * 0.05;
+            // --- NOUVELLE LOGIQUE DE VITESSE ANTI-OSCILLATION ---
+            
+            // Calcul de l'intensité instantanée pondérée
+            let instantIntensity = (smoothedBass * 0.2) + (smoothedMid * 0.25) + (smoothedHigh * 0.25);
+            
+            // Système de "Sustain" (maintien) :
+            // Si l'intensité monte, on la suit assez vite (attaque = 0.1).
+            // Si l'intensité descend (entre deux battements), on descend TRÈS lentement (décroissance = 0.005).
+            if (instantIntensity > sustainedIntensity) {
+                sustainedIntensity += (instantIntensity - sustainedIntensity) * 0.1;
+            } else {
+                sustainedIntensity += (instantIntensity - sustainedIntensity) * 0.005;
+            }
+
+            // Calcul de la vitesse cible basé sur cette intensité "maintenue"
+            // Cela permet d'avoir une vitesse élevée constante tant que la musique est active
+            let targetSpeed = baseSpeed + Math.pow(sustainedIntensity, 5.0) * 1500.0;
+            
+            // Lissage final du mouvement
+            if (targetSpeed > currentSpeed) currentSpeed += (targetSpeed - currentSpeed) * 0.05;
+            else currentSpeed += (targetSpeed - currentSpeed) * 0.02;
 
             const turnSpeedX = (-mousePosition.x * 50) + autoDrift.x; const turnSpeedY = (-mousePosition.y * 50) + autoDrift.y;
 
@@ -586,8 +605,7 @@
                 particles.material.uniforms.uHigh.value = pulseHigh;
             }
 
-            const targetFOV = 70 + (smoothedBass * 20);
-            // Réduction de l'inertie du FOV (0.1 au lieu de 0.02)
+            const targetFOV = 70 + (smoothedBass * 12);
             camera.fov += (targetFOV - camera.fov) * 0.1;
             camera.updateProjectionMatrix();
 
