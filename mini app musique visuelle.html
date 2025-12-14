@@ -481,28 +481,25 @@
 
 
         function addYoutubeTrack(video) {
-            // Construit l'URL de streaming via notre serveur proxy
-            const streamUrl = `${SERVER_URL}/stream?url=${encodeURIComponent(video.url)}`;
-            
-            // Ajoute à la playlist
+            // Construit l'URL originale pour la passer au serveur
             const track = { 
                 title: video.title, 
-                url: streamUrl,
+                originalUrl: video.url, 
+                url: null, // L'URL de streaming CDN sera récupérée par loadTrack
                 isStream: true 
             };
             
             playlist.push(track);
             
-            // Si c'est la seule piste, on la joue tout de suite
             if (playlist.length === 1) {
                 loadTrack(0, true);
             } else {
-                // Sinon on la joue directement (comportement YouTube classique)
                 loadTrack(playlist.length - 1, true);
             }
         }
 
         // --- GESTION AUDIO & PLAYLIST ---
+        
         function setupAudioContext() {
             if (isAudioSetup) return;
             try {
@@ -512,8 +509,6 @@
                 analyser.fftSize = 1024; 
                 const bufferLength = analyser.frequencyBinCount;
                 dataArray = new Uint8Array(bufferLength);
-                
-                // IMPORTANT: createMediaElementSource fonctionne avec le stream SI crossOrigin est set
                 source = audioContext.createMediaElementSource(audioElement);
                 source.connect(analyser);
                 analyser.connect(audioContext.destination);
@@ -524,34 +519,63 @@
             }
         }
 
-        function loadTrack(index, autoPlay = true) {
+        // --- FONCTION MODIFIÉE : CHARGEMENT API DIRECT ---
+        async function loadTrack(index, autoPlay = true) {
             if (index < 0 || index >= playlist.length) return;
             currentTrackIndex = index;
             const track = playlist[index];
             
-            // Reset Audio
-            audioElement.pause();
+            // Si c'est un stream YouTube ET que l'URL de streaming n'est pas encore définie
+            if (track.isStream && !track.url) { 
+                trackInfoEl.textContent = "CHARGEMENT DU FLUX YOUTUBE...";
+                playBtn.disabled = true;
+                
+                try {
+                    // 1. Appel à la nouvelle route pour obtenir l'URL CDN directe
+                    // On utilise l'URL originale de YouTube stockée dans l'objet piste
+                    const streamResponse = await fetch(`${SERVER_URL}/get-audio-url?url=${encodeURIComponent(track.originalUrl)}`);
+                    const streamData = await streamResponse.json();
+
+                    if (streamResponse.status !== 200 || streamData.error) {
+                        throw new Error(streamData.error || 'Erreur du service API.');
+                    }
+                    
+                    // 2. Mise à jour de l'objet piste avec l'URL CDN
+                    track.url = streamData.url;
+                    track.mimeType = streamData.mimeType; // Optionnel mais utile pour la compatibilité
+
+                } catch (error) {
+                    console.error("Erreur de récupération du flux YouTube:", error);
+                    trackTitleEl.textContent = "Erreur de chargement";
+                    trackInfoEl.textContent = "Flux inaccessible. Vérifiez les logs du serveur Render.";
+                    playBtn.disabled = false;
+                    return;
+                }
+            }
             
+            // Si l'URL est enfin définie, on charge l'élément audio
             audioElement.onerror = function() {
-                console.error("Erreur lecture: " + track.url);
-                trackTitleEl.textContent = "Erreur lecture";
-                trackInfoEl.textContent = "Vérifiez le serveur";
+                console.error("Erreur de lecture du fichier audio : " + track.url);
+                trackTitleEl.textContent = "Erreur : " + track.title;
+                trackInfoEl.textContent = "Fichier incompatible ou inaccessible.";
             };
 
             audioElement.src = track.url;
+            // On peut ajouter une source de fallback pour la robustesse, en précisant le type
+            // audioElement.innerHTML = `<source src="${track.url}" type="${track.mimeType}">`;
+
             trackTitleEl.textContent = track.title;
-            trackInfoEl.textContent = track.isStream ? "Streaming YouTube" : `Piste ${index + 1} / ${playlist.length}`;
+            trackInfoEl.textContent = track.isStream ? "Streaming actif" : `Piste ${index + 1} / ${playlist.length}`;
             playBtn.disabled = false;
             progressBar.value = 0;
             updateSliderBackground(0);
             currentTimeEl.textContent = "00:00";
             
             if (autoPlay) {
-                // Petit délai pour laisser le buffer se remplir un peu
-                setTimeout(() => togglePlay(true), 500);
+                setTimeout(() => togglePlay(true), 300);
             }
             
-            if (!isAudioSetup && autoPlay) setupAudioContext();
+            if (!isAudioSetup) setupAudioContext();
         }
 
         function playNext() {
