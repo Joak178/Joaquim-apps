@@ -94,7 +94,6 @@
                 
                 <!-- Résultats -->
                 <div id="search-results" class="flex-1 overflow-y-auto custom-scroll grid grid-cols-1 gap-3 pb-10">
-                    <!-- Les résultats seront injectés ici via JS -->
                     <div class="text-center text-gray-500 mt-10">Recherchez un titre pour commencer...</div>
                 </div>
             </div>
@@ -199,7 +198,7 @@
         let baseSpeed = 0.05; 
         let currentSpeed = baseSpeed;
         
-        // VARIABLE AJOUTÉE POUR LE MAINTIEN D'INTENSITÉ (Anti-oscillation)
+        // VARIABLE AJOUTÉE POUR LE MAINTIEN d'INTENSITÉ (Anti-oscillation)
         let sustainedIntensity = 0;
         
         // Valeurs Audio
@@ -215,7 +214,6 @@
         const trackTitleEl = document.getElementById('track-title');
         const trackInfoEl = document.getElementById('track-info');
         const playBtn = document.getElementById('play-btn');
-        const playText = document.getElementById('play-text'); // Supprimé du bouton mais référé dans code
         const playIcon = document.getElementById('play-icon');
         const pauseIcon = document.getElementById('pause-icon');
         const prevBtn = document.getElementById('prev-btn');
@@ -329,6 +327,24 @@
             window.addEventListener('resize', onWindowResize, false);
             document.addEventListener('mousemove', onDocumentMouseMove, false);
             
+            // --- AJOUT : ÉCOUTEUR POUR LA TOUCHE 'F' (FULLSCREEN UI) ---
+            document.addEventListener('keydown', function(event) {
+                // On ne déclenche pas le raccourci si l'utilisateur écrit dans un champ texte
+                if (event.target.tagName === 'INPUT') return;
+
+                if (event.key.toLowerCase() === 'f') {
+                    const ui = document.getElementById('ui-container');
+                    // Toggle de la classe 'hidden' de Tailwind
+                    if (ui.classList.contains('hidden')) {
+                        ui.classList.remove('hidden');
+                        document.body.style.cursor = 'auto';
+                    } else {
+                        ui.classList.add('hidden');
+                        document.body.style.cursor = 'none';
+                    }
+                }
+            });
+            
             animate();
         }
 
@@ -423,7 +439,6 @@
             searchModal.classList.remove('flex');
         });
 
-        // Fermer le modal si on clique en dehors
         searchModal.addEventListener('click', (e) => {
             if(e.target === searchModal) {
                  searchModal.classList.add('hidden');
@@ -438,11 +453,10 @@
             searchResults.innerHTML = '<div class="text-white text-center mt-10 animate-pulse">Recherche en cours...</div>';
 
             try {
-                // Appel au serveur proxy local
                 const response = await fetch(`${SERVER_URL}/search?q=${encodeURIComponent(query)}`);
                 const videos = await response.json();
                 
-                searchResults.innerHTML = ''; // Clear
+                searchResults.innerHTML = ''; 
 
                 videos.forEach(video => {
                     const el = document.createElement('div');
@@ -472,7 +486,7 @@
 
             } catch (error) {
                 console.error(error);
-                searchResults.innerHTML = '<div class="text-red-400 text-center mt-10">Erreur de connexion au serveur (Port 3000).<br>Vérifiez que node server.js est lancé.</div>';
+                searchResults.innerHTML = '<div class="text-red-400 text-center mt-10">Erreur de connexion au serveur.<br>Vérifiez les logs de Render.</div>';
             }
         }
 
@@ -481,11 +495,10 @@
 
 
         function addYoutubeTrack(video) {
-            // Construit l'URL originale pour la passer au serveur
             const track = { 
                 title: video.title, 
                 originalUrl: video.url, 
-                url: null, // L'URL de streaming CDN sera récupérée par loadTrack
+                url: null, 
                 isStream: true 
             };
             
@@ -519,20 +532,16 @@
             }
         }
 
-        // --- FONCTION MODIFIÉE : CHARGEMENT API DIRECT ---
         async function loadTrack(index, autoPlay = true) {
             if (index < 0 || index >= playlist.length) return;
             currentTrackIndex = index;
             const track = playlist[index];
             
-            // Si c'est un stream YouTube ET que l'URL de streaming n'est pas encore définie
             if (track.isStream && !track.url) { 
                 trackInfoEl.textContent = "CHARGEMENT DU FLUX YOUTUBE...";
                 playBtn.disabled = true;
                 
                 try {
-                    // 1. Appel à la nouvelle route pour obtenir l'URL CDN directe
-                    // On utilise l'URL originale de YouTube stockée dans l'objet piste
                     const streamResponse = await fetch(`${SERVER_URL}/get-audio-url?url=${encodeURIComponent(track.originalUrl)}`);
                     const streamData = await streamResponse.json();
 
@@ -540,20 +549,18 @@
                         throw new Error(streamData.error || 'Erreur du service API.');
                     }
                     
-                    // 2. Mise à jour de l'objet piste avec l'URL CDN
                     track.url = streamData.url;
-                    track.mimeType = streamData.mimeType; // Optionnel mais utile pour la compatibilité
+                    track.mimeType = streamData.mimeType;
 
                 } catch (error) {
                     console.error("Erreur de récupération du flux YouTube:", error);
                     trackTitleEl.textContent = "Erreur de chargement";
-                    trackInfoEl.textContent = "Flux inaccessible. Vérifiez les logs du serveur Render.";
+                    trackInfoEl.textContent = "Flux inaccessible.";
                     playBtn.disabled = false;
                     return;
                 }
             }
             
-            // Si l'URL est enfin définie, on charge l'élément audio
             audioElement.onerror = function() {
                 console.error("Erreur de lecture du fichier audio : " + track.url);
                 trackTitleEl.textContent = "Erreur : " + track.title;
@@ -561,9 +568,6 @@
             };
 
             audioElement.src = track.url;
-            // On peut ajouter une source de fallback pour la robustesse, en précisant le type
-            // audioElement.innerHTML = `<source src="${track.url}" type="${track.mimeType}">`;
-
             trackTitleEl.textContent = track.title;
             trackInfoEl.textContent = track.isStream ? "Streaming actif" : `Piste ${index + 1} / ${playlist.length}`;
             playBtn.disabled = false;
@@ -606,7 +610,7 @@
                         isPlaying = true;
                         updatePlayButtonUI();
                     }).catch(error => {
-                        console.log("Lecture auto bloquée par le navigateur");
+                        console.log("Lecture auto bloquée");
                     });
                 }
             } else {
@@ -624,10 +628,8 @@
         function updatePlayButtonUI() {
             if (isPlaying) {
                 playIcon.classList.add('hidden'); pauseIcon.classList.remove('hidden');
-                // playText.textContent = "PAUSE"; // Retiré du design
             } else {
                 playIcon.classList.remove('hidden'); pauseIcon.classList.add('hidden');
-                // playText.textContent = "PLAY";
             }
         }
 
@@ -638,12 +640,10 @@
         audioInput.addEventListener('change', function(e) {
             const files = Array.from(e.target.files);
             if (files.length === 0) return;
-            
             files.forEach(file => {
                 const name = file.name.replace(/\.[^/.]+$/, "");
                 playlist.push({ title: name, url: URL.createObjectURL(file), isStream: false });
             });
-            
             if (playlist.length === files.length) loadTrack(0, true);
         });
 
@@ -695,7 +695,6 @@
             requestAnimationFrame(animate);
 
             let bassIntensity = 0; let midIntensity = 0; let highIntensity = 0;
-            const time = Date.now() * 0.001; 
             
             if (isAudioSetup && isPlaying && analyser) {
                 analyser.getByteFrequencyData(dataArray);
@@ -722,15 +721,10 @@
             }
 
             let instantIntensity = (smoothedBass * 0.2) + (smoothedMid * 0.25) + (smoothedHigh * 0.25);
-            
-            if (instantIntensity > sustainedIntensity) {
-                sustainedIntensity += (instantIntensity - sustainedIntensity) * 0.1;
-            } else {
-                sustainedIntensity += (instantIntensity - sustainedIntensity) * 0.005;
-            }
+            if (instantIntensity > sustainedIntensity) sustainedIntensity += (instantIntensity - sustainedIntensity) * 0.1;
+            else sustainedIntensity += (instantIntensity - sustainedIntensity) * 0.005;
 
             let targetSpeed = baseSpeed + Math.pow(sustainedIntensity, 5.0) * 1500.0;
-            
             if (targetSpeed > currentSpeed) currentSpeed += (targetSpeed - currentSpeed) * 0.05;
             else currentSpeed += (targetSpeed - currentSpeed) * 0.02;
 
