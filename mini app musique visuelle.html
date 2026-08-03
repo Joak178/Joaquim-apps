@@ -514,26 +514,27 @@
             currentTrackIndex = index;
             const track = playlist[index];
 
+            // 1. Réinitialisation propre de l'élément audio
             audioElement.pause();
-            audioElement.removeAttribute('src');
+            audioElement.currentTime = 0;
             playBtn.disabled = true; 
             trackTitleEl.textContent = "Chargement...";
 
-            // Sauvegarde de la durée totale réelle (ms -> secondes)
             currentTrackDurationSec = track.durationMs ? (track.durationMs / 1000) : 0;
-            
-            // Affiche directement la bonne durée totale dans l'UI avant même que le son ne démarre
             totalDurationEl.textContent = formatTime(currentTrackDurationSec);
 
+            // 2. Attribution de l'URL
             if (track.isStream) {
-                const streamUrl = `${SERVER_URL}/stream?url=${encodeURIComponent(track.originalUrl)}`;
-                audioElement.src = streamUrl;
+                audioElement.src = `${SERVER_URL}/stream?url=${encodeURIComponent(track.originalUrl)}`;
             } else {
                 audioElement.src = track.url;
             }
 
+            // Force le rechargement de la source
+            audioElement.load();
+
             trackTitleEl.textContent = track.title;
-            trackInfoEl.textContent = track.author ? track.author : (track.isStream ? "SoundCloud" : "Fichier Local");
+            trackInfoEl.textContent = track.author ? track.author : "SoundCloud";
             
             audioElement.oncanplay = () => {
                 playBtn.disabled = false;
@@ -541,9 +542,9 @@
                 audioElement.oncanplay = null;
             };
 
-            audioElement.onerror = () => {
-                console.error("Erreur de lecture audio.");
-                trackTitleEl.textContent = "Morceau indisponible : " + track.title;
+            audioElement.onerror = (e) => {
+                console.error("Erreur de lecture audio :", e);
+                trackTitleEl.textContent = "Indisponible : " + track.title;
                 playBtn.disabled = true;
             };
 
