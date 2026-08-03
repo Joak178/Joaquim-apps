@@ -519,8 +519,11 @@
             playBtn.disabled = true; 
             trackTitleEl.textContent = "Chargement...";
 
-            // Durée par défaut stockée pour éviter Infinity
+            // Sauvegarde de la durée totale réelle (ms -> secondes)
             currentTrackDurationSec = track.durationMs ? (track.durationMs / 1000) : 0;
+            
+            // Affiche directement la bonne durée totale dans l'UI avant même que le son ne démarre
+            totalDurationEl.textContent = formatTime(currentTrackDurationSec);
 
             if (track.isStream) {
                 const streamUrl = `${SERVER_URL}/stream?url=${encodeURIComponent(track.originalUrl)}`;
@@ -619,23 +622,26 @@
         }
 
         audioElement.addEventListener('timeupdate', () => {
-            let dur = audioElement.duration;
-            
-            // Si le streaming renvoie Infinity, on retombe sur la durée calculée lors du clic
-            if (!isFinite(dur) || isNaN(dur)) {
-                dur = currentTrackDurationSec;
+            // 1. On récupère la vraie durée (en secondes) stockée lors du clic sur la chanson
+            let totalSec = currentTrackDurationSec;
+
+            // Si currentTrackDurationSec est nulle, on essaye de lire la durée HTML5 si elle est valide
+            if ((!totalSec || totalSec <= 0) && isFinite(audioElement.duration) && !isNaN(audioElement.duration)) {
+                totalSec = audioElement.duration;
             }
 
-            const current = audioElement.currentTime || 0;
+            const currentSec = audioElement.currentTime || 0;
 
-            if (dur > 0) {
-                const progress = (current / dur) * 100;
-                progressBar.value = Math.min(progress, 100);
-                updateSliderBackground(progressBar.value);
+            // 2. Calcul propre du pourcentage pour la barre de progression
+            if (totalSec > 0) {
+                const progressPercent = Math.min((currentSec / totalSec) * 100, 100);
+                progressBar.value = progressPercent;
+                updateSliderBackground(progressPercent);
             }
 
-            currentTimeEl.textContent = formatTime(current);
-            totalDurationEl.textContent = formatTime(dur);
+            // 3. Affichage des temps (Temps écoulé | Durée totale fixe)
+            currentTimeEl.textContent = formatTime(currentSec);
+            totalDurationEl.textContent = formatTime(totalSec);
         });
 
         audioElement.addEventListener('loadedmetadata', () => {
@@ -731,4 +737,4 @@
         initThree();
     </script>
 </body>
-</html>
+</html> 
