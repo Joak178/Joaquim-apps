@@ -165,7 +165,7 @@
 
     <script>
         // --- CONFIGURATION API SERVEUR ---
-        const SERVER_URL = 'https://serveur-appli-musique.onrender.com'; // Adresse du serveur render
+        const SERVER_URL = 'https://serveur-appli-musique.fly.dev/'; // Adresse du serveur render
 
         // --- CONFIGURATION 3D ---
         const PARTICLE_COUNT = 3000;
@@ -327,14 +327,11 @@
             window.addEventListener('resize', onWindowResize, false);
             document.addEventListener('mousemove', onDocumentMouseMove, false);
             
-            // --- AJOUT : ÉCOUTEUR POUR LA TOUCHE 'F' (FULLSCREEN UI) ---
+            // --- RACCOURCI F ---
             document.addEventListener('keydown', function(event) {
-                // On ne déclenche pas le raccourci si l'utilisateur écrit dans un champ texte
                 if (event.target.tagName === 'INPUT') return;
-
                 if (event.key.toLowerCase() === 'f') {
                     const ui = document.getElementById('ui-container');
-                    // Toggle de la classe 'hidden' de Tailwind
                     if (ui.classList.contains('hidden')) {
                         ui.classList.remove('hidden');
                         document.body.style.cursor = 'auto';
@@ -486,7 +483,7 @@
 
             } catch (error) {
                 console.error(error);
-                searchResults.innerHTML = '<div class="text-red-400 text-center mt-10">Erreur de connexion au serveur.<br>Vérifiez les logs de Render.</div>';
+                searchResults.innerHTML = '<div class="text-red-400 text-center mt-10">Erreur de connexion au serveur.</div>';
             }
         }
 
@@ -532,87 +529,70 @@
             }
         }
 
-        async function loadTrack(index, autoPlay = true) {
-            if (index < 0 || index >= playlist.length) return;
-            currentTrackIndex = index;
-            const track = playlist[index];
-            
-            if (track.isStream && !track.url) { 
-                trackInfoEl.textContent = "CHARGEMENT DU FLUX YOUTUBE...";
-                playBtn.disabled = true;
-                
-                try {
-                    const streamResponse = await fetch(`${SERVER_URL}/get-audio-url?url=${encodeURIComponent(track.originalUrl)}`);
-                    const streamData = await streamResponse.json();
+       /**
+ * Charge une piste (YouTube ou Locale) dans le lecteur audio
+ * @param {number} index - L'index de la musique dans la playlist
+ * @param {boolean} autoPlay - Si la musique doit se lancer automatiquement
+ */
+async function loadTrack(index, autoPlay = true) {
+    if (index < 0 || index >= playlist.length) return;
+    
+    currentTrackIndex = index;
+    const track = playlist[index];
 
-                    if (streamResponse.status !== 200 || streamData.error) {
-                        throw new Error(streamData.error || 'Erreur du service API.');
-                    }
-                    
-                    track.url = streamData.url;
-                    track.mimeType = streamData.mimeType;
+    audioElement.pause();
+    audioElement.removeAttribute('src');
+    playBtn.disabled = true; 
+    trackTitleEl.textContent = "Chargement...";
 
-                } catch (error) {
-                    console.error("Erreur de récupération du flux YouTube:", error);
-                    trackTitleEl.textContent = "Erreur de chargement";
-                    trackInfoEl.textContent = "Flux inaccessible.";
-                    playBtn.disabled = false;
-                    return;
-                }
-            }
-            
-            audioElement.onerror = function() {
-                console.error("Erreur de lecture du fichier audio : " + track.url);
-                trackTitleEl.textContent = "Erreur : " + track.title;
-                trackInfoEl.textContent = "Fichier incompatible ou inaccessible.";
-            };
+    if (track.isStream) {
+        // Le backend va renvoyer la vraie URL du flux audio Google
+        const streamUrl = `${SERVER_URL}/stream?url=${encodeURIComponent(track.originalUrl)}`;
+        audioElement.src = streamUrl;
+    } else {
+        audioElement.src = track.url;
+    }
 
-            audioElement.src = track.url;
-            trackTitleEl.textContent = track.title;
-            trackInfoEl.textContent = track.isStream ? "Streaming actif" : `Piste ${index + 1} / ${playlist.length}`;
-            playBtn.disabled = false;
-            progressBar.value = 0;
-            updateSliderBackground(0);
-            currentTimeEl.textContent = "00:00";
-            
-            if (autoPlay) {
-                setTimeout(() => togglePlay(true), 300);
-            }
-            
-            if (!isAudioSetup) setupAudioContext();
-        }
+    trackTitleEl.textContent = track.title;
+    trackInfoEl.textContent = track.isStream ? "YouTube Stream" : `Fichier Local ${index + 1}`;
+    
+    audioElement.oncanplay = () => {
+        playBtn.disabled = false;
+        if (autoPlay) togglePlay(true);
+        audioElement.oncanplay = null;
+    };
+
+    audioElement.onerror = () => {
+        console.error("Erreur de lecture audio.");
+        trackTitleEl.textContent = "Erreur de chargement : " + track.title;
+        playBtn.disabled = true;
+    };
+
+    if (!isAudioSetup) setupAudioContext();
+}
 
         function playNext() {
             if (playlist.length === 0) return;
-            let nextIndex = currentTrackIndex + 1;
-            if (nextIndex >= playlist.length) nextIndex = 0;
-            loadTrack(nextIndex, true);
+            loadTrack((currentTrackIndex + 1) % playlist.length, true);
         }
 
         function playPrev() {
             if (playlist.length === 0) return;
-            let prevIndex = currentTrackIndex - 1;
-            if (prevIndex < 0) prevIndex = playlist.length - 1;
-            loadTrack(prevIndex, true);
+            loadTrack((currentTrackIndex - 1 + playlist.length) % playlist.length, true);
         }
 
         function togglePlay(forcePlay = false) {
             if (!isAudioSetup) setupAudioContext();
             
             if (audioContext && audioContext.state === 'suspended') {
-                audioContext.resume().catch(e => console.log("Impossible de reprendre l'AudioContext", e));
+                audioContext.resume();
             }
             
             if (forcePlay === true) {
-                const playPromise = audioElement.play();
-                if (playPromise !== undefined) {
-                    playPromise.then(_ => {
-                        isPlaying = true;
-                        updatePlayButtonUI();
-                    }).catch(error => {
-                        console.log("Lecture auto bloquée");
-                    });
-                }
+                audioElement.play().then(() => {
+                    isPlaying = true;
+                    updatePlayButtonUI();
+                }).catch(() => {});
             } else {
                 if (isPlaying) { 
                     audioElement.pause(); 
@@ -641,8 +621,7 @@
             const files = Array.from(e.target.files);
             if (files.length === 0) return;
             files.forEach(file => {
-                const name = file.name.replace(/\.[^/.]+$/, "");
-                playlist.push({ title: name, url: URL.createObjectURL(file), isStream: false });
+                playlist.push({ title: file.name.split('.')[0], url: URL.createObjectURL(file), isStream: false });
             });
             if (playlist.length === files.length) loadTrack(0, true);
         });
@@ -676,8 +655,7 @@
         progressBar.addEventListener('input', (e) => {
             if (!audioElement.duration) return;
             const val = e.target.value; updateSliderBackground(val);
-            const seekTime = (val / 100) * audioElement.duration;
-            audioElement.currentTime = seekTime;
+            audioElement.currentTime = (val / 100) * audioElement.duration;
         });
 
         function onDocumentMouseMove(event) {
@@ -703,17 +681,13 @@
                 let hTotal = 0; for(let i=100; i<300; i++) hTotal += dataArray[i]; highIntensity = (hTotal / 200) / 255;
             }
 
-            if (bassIntensity > smoothedBass) smoothedBass += (bassIntensity - smoothedBass) * 0.15;
-            else smoothedBass += (bassIntensity - smoothedBass) * 0.05;
-            smoothedMid += (midIntensity - smoothedMid) * 0.15;
-            smoothedHigh += (highIntensity - smoothedHigh) * 0.15;
+            smoothedBass += (bassIntensity - smoothedBass) * 0.1;
+            smoothedMid += (midIntensity - smoothedMid) * 0.1;
+            smoothedHigh += (highIntensity - smoothedHigh) * 0.1;
 
-            let cleanBass = Math.max(0, bassIntensity - 0.4) * 2.0; cleanBass = Math.min(cleanBass, 1.0); 
-            if (cleanBass > pulseBass) pulseBass = cleanBass; else pulseBass += (0 - pulseBass) * 0.2; 
-            let cleanMid = Math.max(0, midIntensity - 0.3) * 2.0; cleanMid = Math.min(cleanMid, 1.0);
-            if (cleanMid > pulseMid) pulseMid = cleanMid; else pulseMid += (0 - pulseMid) * 0.15;
-            let cleanHigh = Math.max(0, highIntensity - 0.2) * 2.5; cleanHigh = Math.min(cleanHigh, 1.0);
-            if (cleanHigh > pulseHigh) pulseHigh = cleanHigh; else pulseHigh += (0 - pulseHigh) * 0.25;
+            pulseBass = Math.max(0, bassIntensity - 0.4) * 2.0;
+            pulseMid = Math.max(0, midIntensity - 0.3) * 2.0;
+            pulseHigh = Math.max(0, highIntensity - 0.2) * 2.5;
 
             if (scene.fog) {
                 const flashR = 1 + (pulseBass * 15); const flashG = 1 + (pulseBass * 8); const flashB = 3 + (pulseBass * 30);
@@ -721,44 +695,38 @@
             }
 
             let instantIntensity = (smoothedBass * 0.2) + (smoothedMid * 0.25) + (smoothedHigh * 0.25);
-            if (instantIntensity > sustainedIntensity) sustainedIntensity += (instantIntensity - sustainedIntensity) * 0.1;
-            else sustainedIntensity += (instantIntensity - sustainedIntensity) * 0.005;
+            sustainedIntensity += (instantIntensity - sustainedIntensity) * (instantIntensity > sustainedIntensity ? 0.1 : 0.005);
 
             let targetSpeed = baseSpeed + Math.pow(sustainedIntensity, 5.0) * 1500.0;
-            if (targetSpeed > currentSpeed) currentSpeed += (targetSpeed - currentSpeed) * 0.05;
-            else currentSpeed += (targetSpeed - currentSpeed) * 0.02;
-
-            const turnSpeedX = (-mousePosition.x * 50) + autoDrift.x; const turnSpeedY = (-mousePosition.y * 50) + autoDrift.y;
+            currentSpeed += (targetSpeed - currentSpeed) * 0.05;
 
             if (particles) {
-                const targetRoll = (-mousePosition.x * 0.8) + autoRoll;
-                particles.rotation.z += (targetRoll - particles.rotation.z) * 0.02; 
-                particles.material.uniforms.uBass.value = pulseBass;
-                particles.material.uniforms.uMid.value = pulseMid;
-                particles.material.uniforms.uHigh.value = pulseHigh;
-            }
+                particles.rotation.z += ((-mousePosition.x * 0.8) - particles.rotation.z) * 0.02; 
+                particles.material.uniforms.uBass.value = Math.min(pulseBass, 1.0);
+                particles.material.uniforms.uMid.value = Math.min(pulseMid, 1.0);
+                particles.material.uniforms.uHigh.value = Math.min(pulseHigh, 1.0);
 
-            const targetFOV = 70 + (smoothedBass * 12);
-            camera.fov += (targetFOV - camera.fov) * 0.1;
-            camera.updateProjectionMatrix();
-
-            const positions = particles.geometry.attributes.position.array;
-            const maxZ = 2000; const spawnZ = -SPACE_DEPTH + 1000; const halfWidth = SPACE_WIDTH / 2;
-            const currentTurnX = turnSpeedX * (1 + smoothedBass * 2); const currentTurnY = turnSpeedY * (1 + smoothedBass * 2);
-            
-            for (let i = 0; i < PARTICLE_COUNT; i++) {
-                let i3 = i * 3;
-                positions[i3 + 2] += currentSpeed;
-                positions[i3] += currentTurnX; positions[i3 + 1] += currentTurnY; 
-                if (positions[i3] > halfWidth) positions[i3] -= SPACE_WIDTH; if (positions[i3] < -halfWidth) positions[i3] += SPACE_WIDTH;
-                if (positions[i3+1] > halfWidth) positions[i3+1] -= SPACE_WIDTH; if (positions[i3+1] < -halfWidth) positions[i3+1] += SPACE_WIDTH;
-                if (positions[i3 + 2] > maxZ) {
-                    positions[i3 + 2] = spawnZ - Math.random() * 500; 
-                    positions[i3] = (Math.random() - 0.5) * SPACE_WIDTH;
-                    positions[i3+1] = (Math.random() - 0.5) * SPACE_WIDTH;
+                const positions = particles.geometry.attributes.position.array;
+                const turnX = (-mousePosition.x * 50) * (1 + smoothedBass * 2);
+                const turnY = (-mousePosition.y * 50) * (1 + smoothedBass * 2);
+                
+                for (let i = 0; i < PARTICLE_COUNT; i++) {
+                    let i3 = i * 3;
+                    positions[i3 + 2] += currentSpeed;
+                    positions[i3] += turnX; positions[i3 + 1] += turnY; 
+                    if (positions[i3] > 5000) positions[i3] -= 10000; if (positions[i3] < -5000) positions[i3] += 10000;
+                    if (positions[i3+1] > 5000) positions[i3+1] -= 10000; if (positions[i3+1] < -5000) positions[i3+1] += 10000;
+                    if (positions[i3 + 2] > 2000) {
+                        positions[i3 + 2] = -4000 - Math.random() * 500; 
+                        positions[i3] = (Math.random() - 0.5) * SPACE_WIDTH;
+                        positions[i3+1] = (Math.random() - 0.5) * SPACE_WIDTH;
+                    }
                 }
+                particles.geometry.attributes.position.needsUpdate = true;
             }
-            particles.geometry.attributes.position.needsUpdate = true;
+
+            camera.fov = 70 + (smoothedBass * 12);
+            camera.updateProjectionMatrix();
             renderer.render(scene, camera);
         }
 
