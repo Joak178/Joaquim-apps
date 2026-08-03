@@ -622,26 +622,24 @@
         }
 
         audioElement.addEventListener('timeupdate', () => {
-            // 1. On récupère la vraie durée (en secondes) stockée lors du clic sur la chanson
-            let totalSec = currentTrackDurationSec;
+            // On utilise en priorité la durée exacte renvoyée par le serveur lors de la recherche
+            let dur = currentTrackDurationSec;
 
-            // Si currentTrackDurationSec est nulle, on essaye de lire la durée HTML5 si elle est valide
-            if ((!totalSec || totalSec <= 0) && isFinite(audioElement.duration) && !isNaN(audioElement.duration)) {
-                totalSec = audioElement.duration;
+            // Secours si la durée stockée est absente
+            if ((!dur || dur <= 0) && isFinite(audioElement.duration) && !isNaN(audioElement.duration)) {
+                dur = audioElement.duration;
             }
 
-            const currentSec = audioElement.currentTime || 0;
+            const current = audioElement.currentTime || 0;
 
-            // 2. Calcul propre du pourcentage pour la barre de progression
-            if (totalSec > 0) {
-                const progressPercent = Math.min((currentSec / totalSec) * 100, 100);
+            if (dur > 0) {
+                const progressPercent = Math.min((current / dur) * 100, 100);
                 progressBar.value = progressPercent;
                 updateSliderBackground(progressPercent);
             }
 
-            // 3. Affichage des temps (Temps écoulé | Durée totale fixe)
-            currentTimeEl.textContent = formatTime(currentSec);
-            totalDurationEl.textContent = formatTime(totalSec);
+            currentTimeEl.textContent = formatTime(current);
+            totalDurationEl.textContent = formatTime(dur);
         });
 
         audioElement.addEventListener('loadedmetadata', () => {
