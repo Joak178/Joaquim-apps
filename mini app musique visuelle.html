@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Voyage Audio 3D - YouTube Edition</title>
+    <title>Voyage Audio 3D - SoundCloud Edition</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Three.js -->
@@ -29,7 +29,7 @@
             transition: all 0.3s ease;
         }
 
-        /* --- Scrollbar custom pour les résultats --- */
+        /* --- Scrollbar custom --- */
         .custom-scroll::-webkit-scrollbar { width: 6px; }
         .custom-scroll::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
         .custom-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
@@ -75,7 +75,7 @@
     <!-- UI Container -->
     <div id="ui-container" class="absolute top-0 left-0 w-full h-full pointer-events-none flex flex-col justify-between items-center p-6 z-10 transition-opacity duration-500">
         
-        <!-- HAUT : Titre de la Musique -->
+        <!-- HAUT : Titre & Artiste de la Musique -->
         <div class="glass-panel px-6 py-3 rounded-full pointer-events-auto fade-in mt-4 max-w-xl text-center border-t border-white/20">
             <h2 id="track-title" class="text-lg font-bold text-white tracking-wider truncate drop-shadow-md">
                 Aucune musique
@@ -83,18 +83,18 @@
             <p id="track-info" class="text-blue-300 text-xs uppercase tracking-widest mt-0.5">Playlist vide</p>
         </div>
 
-        <!-- MODAL DE RECHERCHE YOUTUBE (Caché par défaut) -->
+        <!-- MODAL DE RECHERCHE SOUNDCLOUD -->
         <div id="search-modal" class="absolute inset-0 bg-black/80 backdrop-blur-md z-50 pointer-events-auto hidden flex-col items-center justify-start pt-20 transition-all duration-300">
             <div class="w-full max-w-2xl px-4 flex flex-col h-[80vh]">
                 <div class="flex items-center gap-2 mb-6">
-                    <input type="text" id="yt-search-input" placeholder="Rechercher sur YouTube..." class="w-full bg-white/10 border border-white/20 rounded-xl px-5 py-4 text-white placeholder-gray-400 focus:outline-none focus:bg-white/20 transition text-lg">
+                    <input type="text" id="yt-search-input" placeholder="Rechercher sur SoundCloud..." class="w-full bg-white/10 border border-white/20 rounded-xl px-5 py-4 text-white placeholder-gray-400 focus:outline-none focus:bg-white/20 transition text-lg">
                     <button id="yt-search-btn" class="bg-blue-600 hover:bg-blue-500 text-white px-6 py-4 rounded-xl font-bold transition">GO</button>
                     <button id="close-search-btn" class="bg-red-500/20 hover:bg-red-500/40 text-red-300 px-4 py-4 rounded-xl font-bold transition">X</button>
                 </div>
                 
                 <!-- Résultats -->
                 <div id="search-results" class="flex-1 overflow-y-auto custom-scroll grid grid-cols-1 gap-3 pb-10">
-                    <div class="text-center text-gray-500 mt-10">Recherchez un titre pour commencer...</div>
+                    <div class="text-center text-gray-500 mt-10">Recherchez un titre ou un artiste pour commencer...</div>
                 </div>
             </div>
         </div>
@@ -106,8 +106,8 @@
             <div class="relative flex items-center justify-center w-full mt-2">
                 
                 <div class="flex items-center justify-center gap-4">
-                    <!-- Bouton Recherche (Nouveau) -->
-                    <button id="open-search-btn" class="text-gray-400 hover:text-white transition transform active:scale-90 p-2" title="Rechercher sur YouTube">
+                    <!-- Bouton Recherche -->
+                    <button id="open-search-btn" class="text-gray-400 hover:text-white transition transform active:scale-90 p-2" title="Rechercher sur SoundCloud">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                         </svg>
@@ -147,7 +147,7 @@
 
             <!-- Barre de progression -->
             <div class="w-full flex flex-col gap-1 px-1 mt-1">
-                <input type="range" id="progress-bar" value="0" min="0" step="0.1" class="w-full mb-0" style="background: rgba(255, 255, 255, 0.1);">
+                <input type="range" id="progress-bar" value="0" min="0" max="100" step="0.1" class="w-full mb-0" style="background: rgba(255, 255, 255, 0.1);">
                 
                 <div class="flex justify-between font-sans text-[10px] tracking-widest font-bold uppercase mt-1 text-gray-400">
                     <span id="current-time">00:00</span>
@@ -155,7 +155,6 @@
                 </div>
             </div>
 
-            <!-- IMPORTANT: crossorigin="anonymous" est vital pour l'analyse audio des sources externes -->
             <audio id="audio-element" class="hidden" crossorigin="anonymous"></audio>
         </div>
     </div>
@@ -165,7 +164,7 @@
 
     <script>
         // --- CONFIGURATION API SERVEUR ---
-        const SERVER_URL = 'https://serveur-appli-musique.fly.dev'; // Adresse du serveur fly dev
+        const SERVER_URL = 'https://serveur-appli-musique.fly.dev';
 
         // --- CONFIGURATION 3D ---
         const PARTICLE_COUNT = 3000;
@@ -175,8 +174,7 @@
         // --- VARIABLES GLOBALES ---
         let scene, camera, renderer;
         let particles, geometry;
-        let originalPositions; 
-        let randomOffsets; 
+        let originalPositions, randomOffsets; 
         
         let audioContext, analyser, dataArray, source;
         let isAudioSetup = false;
@@ -184,31 +182,16 @@
         
         let playlist = [];
         let currentTrackIndex = 0;
+        let currentTrackDurationSec = 0; // Pour parer au problème d'Infinity
 
-        let beatCounter = 0;
-        let lastBeatTime = 0;
-        let beatThreshold = 0.6; 
-        
         // Pilotage
         let mousePosition = { x: 0, y: 0 };
-        let autoDrift = { x: 0, y: 0 };
-        let autoRoll = 0;               
-        
-        // VITESSE & INERTIE
         let baseSpeed = 0.05; 
         let currentSpeed = baseSpeed;
-        
-        // VARIABLE AJOUTÉE POUR LE MAINTIEN d'INTENSITÉ (Anti-oscillation)
         let sustainedIntensity = 0;
         
-        // Valeurs Audio
-        let smoothedBass = 0; 
-        let smoothedMid = 0; 
-        let smoothedHigh = 0;
-        
-        let pulseBass = 0;   
-        let pulseMid = 0;
-        let pulseHigh = 0;
+        let smoothedBass = 0, smoothedMid = 0, smoothedHigh = 0;
+        let pulseBass = 0, pulseMid = 0, pulseHigh = 0;
 
         // UI Elements
         const trackTitleEl = document.getElementById('track-title');
@@ -260,7 +243,6 @@
                 else intensity = uHigh * 1.4;
 
                 float personalMultiplier = 0.8 + (aRandom * 0.4); 
-                
                 float expansion = pow(intensity, 2.0) * 120.0 * personalMultiplier; 
                 
                 gl_PointSize = (uBaseSize + expansion) * (300.0 / -mvPosition.z);
@@ -300,7 +282,6 @@
                 uv.y = uv.y + ((3.0 - row) * 0.25); 
                 
                 vec4 texColor = texture2D(pointTexture, uv);
-                
                 float brightness = 0.8 + (intensity * 0.3);
                 
                 gl_FragColor = vec4(color * vColor * brightness, 1.0) * texColor;
@@ -327,7 +308,6 @@
             window.addEventListener('resize', onWindowResize, false);
             document.addEventListener('mousemove', onDocumentMouseMove, false);
             
-            // --- RACCOURCI F ---
             document.addEventListener('keydown', function(event) {
                 if (event.target.tagName === 'INPUT') return;
                 if (event.key.toLowerCase() === 'f') {
@@ -345,7 +325,6 @@
             animate();
         }
 
-        // --- GÉNÉRATEUR D'ATLAS HD ---
         function getSpriteAtlas() {
             const atlasSize = 2048; const cellSize = 512;
             const canvas = document.createElement('canvas');
@@ -424,7 +403,7 @@
             scene.add(particles);
         }
 
-        // --- GESTION RECHERCHE YOUTUBE ---
+        // --- GESTION RECHERCHE SOUNDCLOUD ---
         openSearchBtn.addEventListener('click', () => {
             searchModal.classList.remove('hidden');
             searchModal.classList.add('flex');
@@ -447,22 +426,27 @@
             const query = ytSearchInput.value;
             if(!query) return;
 
-            searchResults.innerHTML = '<div class="text-white text-center mt-10 animate-pulse">Recherche en cours...</div>';
+            searchResults.innerHTML = '<div class="text-white text-center mt-10 animate-pulse">Recherche sur SoundCloud...</div>';
 
             try {
                 const response = await fetch(`${SERVER_URL}/search?q=${encodeURIComponent(query)}`);
-                const videos = await response.json();
+                const tracks = await response.json();
                 
                 searchResults.innerHTML = ''; 
 
-                videos.forEach(video => {
+                if (!tracks || tracks.length === 0) {
+                    searchResults.innerHTML = '<div class="text-gray-400 text-center mt-10">Aucun résultat trouvé.</div>';
+                    return;
+                }
+
+                tracks.forEach(track => {
                     const el = document.createElement('div');
                     el.className = 'glass-panel p-3 flex items-center gap-4 cursor-pointer hover:bg-white/10 transition group';
                     el.innerHTML = `
-                        <img src="${video.thumbnail}" class="w-24 h-16 object-cover rounded-lg group-hover:scale-105 transition duration-300">
+                        <img src="${track.thumbnail}" class="w-16 h-16 object-cover rounded-lg group-hover:scale-105 transition duration-300">
                         <div class="flex-1 min-w-0">
-                            <h3 class="font-bold text-white text-sm truncate">${video.title}</h3>
-                            <p class="text-blue-300 text-xs">${video.author} • ${video.duration}</p>
+                            <h3 class="font-bold text-white text-sm truncate">${track.title}</h3>
+                            <p class="text-blue-300 text-xs truncate">${track.author} • ${track.duration}</p>
                         </div>
                         <button class="bg-blue-600 p-2 rounded-full opacity-0 group-hover:opacity-100 transition">
                              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -473,7 +457,7 @@
                     `;
                     
                     el.addEventListener('click', () => {
-                        addYoutubeTrack(video);
+                        addSoundcloudTrack(track);
                         searchModal.classList.add('hidden');
                         searchModal.classList.remove('flex');
                     });
@@ -490,22 +474,17 @@
         ytSearchBtn.addEventListener('click', performSearch);
         ytSearchInput.addEventListener('keypress', (e) => { if(e.key === 'Enter') performSearch(); });
 
-
-        function addYoutubeTrack(video) {
+        function addSoundcloudTrack(trackData) {
             const track = { 
-                title: video.title, 
-                originalUrl: video.url, 
-                url: null, 
+                title: trackData.title,
+                author: trackData.author,
+                originalUrl: trackData.url, 
+                durationMs: trackData.durationMs || 0,
                 isStream: true 
             };
             
             playlist.push(track);
-            
-            if (playlist.length === 1) {
-                loadTrack(0, true);
-            } else {
-                loadTrack(playlist.length - 1, true);
-            }
+            loadTrack(playlist.length - 1, true);
         }
 
         // --- GESTION AUDIO & PLAYLIST ---
@@ -529,47 +508,44 @@
             }
         }
 
-       /**
- * Charge une piste (YouTube ou Locale) dans le lecteur audio
- * @param {number} index - L'index de la musique dans la playlist
- * @param {boolean} autoPlay - Si la musique doit se lancer automatiquement
- */
-async function loadTrack(index, autoPlay = true) {
-    if (index < 0 || index >= playlist.length) return;
-    
-    currentTrackIndex = index;
-    const track = playlist[index];
+        async function loadTrack(index, autoPlay = true) {
+            if (index < 0 || index >= playlist.length) return;
+            
+            currentTrackIndex = index;
+            const track = playlist[index];
 
-    audioElement.pause();
-    audioElement.removeAttribute('src');
-    playBtn.disabled = true; 
-    trackTitleEl.textContent = "Chargement...";
+            audioElement.pause();
+            audioElement.removeAttribute('src');
+            playBtn.disabled = true; 
+            trackTitleEl.textContent = "Chargement...";
 
-    if (track.isStream) {
-        // Le backend va renvoyer la vraie URL du flux audio Google
-        const streamUrl = `${SERVER_URL}/stream?url=${encodeURIComponent(track.originalUrl)}`;
-        audioElement.src = streamUrl;
-    } else {
-        audioElement.src = track.url;
-    }
+            // Durée par défaut stockée pour éviter Infinity
+            currentTrackDurationSec = track.durationMs ? (track.durationMs / 1000) : 0;
 
-    trackTitleEl.textContent = track.title;
-    trackInfoEl.textContent = track.isStream ? "YouTube Stream" : `Fichier Local ${index + 1}`;
-    
-    audioElement.oncanplay = () => {
-        playBtn.disabled = false;
-        if (autoPlay) togglePlay(true);
-        audioElement.oncanplay = null;
-    };
+            if (track.isStream) {
+                const streamUrl = `${SERVER_URL}/stream?url=${encodeURIComponent(track.originalUrl)}`;
+                audioElement.src = streamUrl;
+            } else {
+                audioElement.src = track.url;
+            }
 
-    audioElement.onerror = () => {
-        console.error("Erreur de lecture audio.");
-        trackTitleEl.textContent = "Erreur de chargement : " + track.title;
-        playBtn.disabled = true;
-    };
+            trackTitleEl.textContent = track.title;
+            trackInfoEl.textContent = track.author ? track.author : (track.isStream ? "SoundCloud" : "Fichier Local");
+            
+            audioElement.oncanplay = () => {
+                playBtn.disabled = false;
+                if (autoPlay) togglePlay(true);
+                audioElement.oncanplay = null;
+            };
 
-    if (!isAudioSetup) setupAudioContext();
-}
+            audioElement.onerror = () => {
+                console.error("Erreur de lecture audio.");
+                trackTitleEl.textContent = "Morceau indisponible : " + track.title;
+                playBtn.disabled = true;
+            };
+
+            if (!isAudioSetup) setupAudioContext();
+        }
 
         function playNext() {
             if (playlist.length === 0) return;
@@ -621,47 +597,70 @@ async function loadTrack(index, autoPlay = true) {
             const files = Array.from(e.target.files);
             if (files.length === 0) return;
             files.forEach(file => {
-                playlist.push({ title: file.name.split('.')[0], url: URL.createObjectURL(file), isStream: false });
+                playlist.push({ 
+                    title: file.name.split('.')[0], 
+                    author: 'Fichier Local',
+                    url: URL.createObjectURL(file), 
+                    isStream: false 
+                });
             });
             if (playlist.length === files.length) loadTrack(0, true);
         });
 
         // UI Updates
         function formatTime(seconds) {
-            if (!seconds || isNaN(seconds)) return "00:00";
+            if (!seconds || isNaN(seconds) || !isFinite(seconds)) return "00:00";
             const m = Math.floor(seconds / 60); const s = Math.floor(seconds % 60);
             return `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
         }
 
         function updateSliderBackground(value) {
-            const percentage = value;
-            progressBar.style.background = `linear-gradient(to right, #60a5fa 0%, #a78bfa ${percentage}%, rgba(255, 255, 255, 0.1) ${percentage}%, rgba(255, 255, 255, 0.1) 100%)`;
+            progressBar.style.background = `linear-gradient(to right, #60a5fa 0%, #a78bfa ${value}%, rgba(255, 255, 255, 0.1) ${value}%, rgba(255, 255, 255, 0.1) 100%)`;
         }
 
         audioElement.addEventListener('timeupdate', () => {
-            if (!audioElement.duration) return;
-            const progress = (audioElement.currentTime / audioElement.duration) * 100;
-            progressBar.value = progress;
-            updateSliderBackground(progress);
-            currentTimeEl.textContent = formatTime(audioElement.currentTime);
+            let dur = audioElement.duration;
+            
+            // Si le streaming renvoie Infinity, on retombe sur la durée calculée lors du clic
+            if (!isFinite(dur) || isNaN(dur)) {
+                dur = currentTrackDurationSec;
+            }
+
+            const current = audioElement.currentTime || 0;
+
+            if (dur > 0) {
+                const progress = (current / dur) * 100;
+                progressBar.value = Math.min(progress, 100);
+                updateSliderBackground(progressBar.value);
+            }
+
+            currentTimeEl.textContent = formatTime(current);
+            totalDurationEl.textContent = formatTime(dur);
         });
 
         audioElement.addEventListener('loadedmetadata', () => {
-            totalDurationEl.textContent = formatTime(audioElement.duration);
+            if (isFinite(audioElement.duration)) {
+                currentTrackDurationSec = audioElement.duration;
+            }
+            totalDurationEl.textContent = formatTime(currentTrackDurationSec);
         });
 
         audioElement.addEventListener('ended', playNext);
 
         progressBar.addEventListener('input', (e) => {
-            if (!audioElement.duration) return;
-            const val = e.target.value; updateSliderBackground(val);
-            audioElement.currentTime = (val / 100) * audioElement.duration;
+            let dur = audioElement.duration;
+            if (!isFinite(dur) || isNaN(dur)) dur = currentTrackDurationSec;
+            if (!dur) return;
+
+            const val = e.target.value; 
+            updateSliderBackground(val);
+            audioElement.currentTime = (val / 100) * dur;
         });
 
         function onDocumentMouseMove(event) {
             mousePosition.x = (event.clientX / window.innerWidth) * 2 - 1;
             mousePosition.y = (event.clientY / window.innerHeight) * 2 - 1;
-        }
+        } 
         
         function onWindowResize() {
             camera.aspect = window.innerWidth / window.innerHeight;
@@ -729,7 +728,6 @@ async function loadTrack(index, autoPlay = true) {
             camera.updateProjectionMatrix();
             renderer.render(scene, camera);
         }
-
         initThree();
     </script>
 </body>
