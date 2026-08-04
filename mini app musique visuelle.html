@@ -542,9 +542,25 @@
                 audioElement.oncanplay = null;
             };
 
-            audioElement.onerror = (e) => {
-                console.error("Erreur de lecture audio :", e);
-                trackTitleEl.textContent = "Indisponible : " + track.title;
+            audioElement.onerror = async () => {
+                // Si la musique échoue, on interroge le serveur pour connaître la raison
+                const currentTrack = playlist[currentTrackIndex];
+                if (currentTrack && currentTrack.isStream) {
+                    try {
+                        const checkRes = await fetch(`${SERVER_URL}/stream?url=${encodeURIComponent(currentTrack.originalUrl)}`);
+                        
+                        if (checkRes.status === 403) {
+                            trackTitleEl.textContent = "🔒 Titre protégé par DRM (Indisponible)";
+                            console.warn("Morceau ignoré : Protections DRM / Widevine actives sur SoundCloud.");
+                            
+                            // Optionnel : passer automatiquement au morceau suivant après 2 secondes
+                            setTimeout(() => { playNext(); }, 2000);
+                            return;
+                        }
+                    } catch (e) {}
+                }
+
+                trackTitleEl.textContent = "Erreur de lecture : " + (currentTrack ? currentTrack.title : "");
                 playBtn.disabled = true;
             };
 
